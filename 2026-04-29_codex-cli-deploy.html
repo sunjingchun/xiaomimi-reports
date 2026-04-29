@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Codex CLI 云部署实操指南</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:800px;margin:0 auto;padding:20px;background:#1a1a2e;color:#e0e0e0;line-height:1.6}
+h1{color:#fd79a8;font-size:1.8em}h2{color:#00cec9;border-bottom:1px solid #2d3436;padding-bottom:8px;margin-top:32px}h3{color:#dfe6e9;margin-top:24px}h4{color:#fab1a0}
+table{width:100%;border-collapse:collapse;margin:16px 0}
+th{background:#2d3436;color:#00cec9;padding:10px 12px;text-align:left;font-size:14px}
+td{border-bottom:1px solid #2d3436;padding:8px 12px;font-size:14px}
+code{background:#2d3436;padding:2px 6px;border-radius:4px;font-size:13px;color:#fdcb6e}
+pre{background:#0a0a1a;padding:16px;border-radius:8px;overflow-x:auto;border:1px solid #2d3436;font-size:13px}
+pre code{background:transparent;padding:0;color:#dfe6e9}
+a{color:#74b9ff}
+strong{color:#ffeaa7}
+em{color:#81ecec}
+blockquote{border-left:3px solid #fd79a8;margin:16px 0;padding:8px 16px;background:#2d3436;border-radius:0 8px 8px 0}
+ul,ol{padding-left:24px}li{margin:6px 0}
+hr{border:none;border-top:1px solid #2d3436;margin:24px 0}
+</style>
+</head>
+<body>
+<h1>Codex CLI 云环境部署实操指南</h1>
+<blockquote>
+<p>编写日期：2026-04-29 | 基于 Codex CLI 2026 Q1 版本（Rust 核心，npm 分发）</p>
+</blockquote>
+<hr />
+<h2>一、Codex CLI 概述</h2>
+<p>OpenAI Codex CLI 是一个开源（Apache-2.0）Rust 实现的终端编码 agent。核心特点：</p>
+<ul>
+<li><strong>本地执行</strong>：读取/修改文件、运行命令都在本机完成</li>
+<li><strong>OS 级沙箱</strong>：macOS Seatbelt / Linux bubblewrap + Landlock / Windows AppContainer</li>
+<li><strong>无头模式</strong>：<code>codex exec</code> 适合 CI/CD 和脚本自动化</li>
+<li><strong>模型</strong>：GPT-5.3-Codex（旗舰）/ GPT-5.3-Codex-Spark（低延迟）/ GPT-5-Codex-Mini（经济）</li>
+<li><strong>安装</strong>：<code>npm install -g @openai/codex</code> 或直接下载 GitHub Releases 二进制</li>
+</ul>
+<hr />
+<h2>二、部署场景</h2>
+<h3>场景 A：AWS Lightsail</h3>
+<p>适合低成本、固定预算的小型团队或个人 CI/CD runner。</p>
+<h4>系统要求</h4>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>最低</th>
+<th>推荐</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>实例类型</td>
+<td>$5/月 (1 vCPU, 512 MB)</td>
+<td>$10/月 (1 vCPU, 2 GB)</td>
+</tr>
+<tr>
+<td>OS</td>
+<td>Ubuntu 22.04 LTS</td>
+<td>Ubuntu 24.04 LTS</td>
+</tr>
+<tr>
+<td>Node.js</td>
+<td>18+</td>
+<td>22 LTS</td>
+</tr>
+<tr>
+<td>磁盘</td>
+<td>20 GB SSD</td>
+<td>40 GB SSD</td>
+</tr>
+<tr>
+<td>网络</td>
+<td>出站 HTTPS 到 api.openai.com</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>⚠️ 512 MB 实例<strong>不推荐</strong>：npm install 大包时可能 OOM。建议至少 2 GB。</p>
+</blockquote>
+<h4>安装步骤</h4>
+<pre class="codehilite"><code class="language-bash"># 1. 更新系统
+sudo apt update &amp;&amp; sudo apt upgrade -y
+
+# 2. 安装 Node.js 22（LTS）
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs git build-essential
+
+# 验证
+node --version  # v22.x
+npm --version   # 10.x+
+
+# 3. 安装 Codex CLI
+npm install -g @openai/codex
+
+# 4. 配置 API Key（无头模式必须）
+export OPENAI_API_KEY=&quot;sk-...&quot;
+echo 'export OPENAI_API_KEY=&quot;sk-...&quot;' &gt;&gt; ~/.bashrc
+
+# 或写入 config.toml
+mkdir -p ~/.codex
+cat &gt; ~/.codex/config.toml &lt;&lt; 'EOF'
+preferred_auth_method = &quot;apikey&quot;
+model = &quot;gpt-5.3-codex&quot;
+approval_policy = &quot;never&quot;
+sandbox_mode = &quot;workspace-write&quot;
+EOF
+
+# 5. 验证
+codex --version
+codex exec &quot;echo hello world&quot;
+</code></pre>
+
+<h4>Sandbox 配置</h4>
+<p>Linux 上 Codex 使用 <strong>bubblewrap + Landlock</strong> 进行系统级沙箱隔离：</p>
+<pre class="codehilite"><code class="language-toml"># ~/.codex/config.toml
+sandbox_mode = &quot;workspace-write&quot;     # 仅项目目录可写
+# 或
+sandbox_mode = &quot;read-only&quot;           # 只读模式（code review）
+# 或
+sandbox_mode = &quot;danger-full-access&quot;  # 无限制（仅可信环境）
+</code></pre>
+
+<p>对于 Lightsail 上的 CI/CD：
+- <strong>code review</strong>：<code>read-only</code>（最安全）
+- <strong>auto-fix</strong>：<code>workspace-write</code>（推荐）
+- <strong>e2e test/部署</strong>：<code>danger-full-access</code>（需额外安全措施）</p>
+<h4>Lightsail 特定注意事项</h4>
+<ol>
+<li><strong>静态 IP</strong>：建议附加静态 IP（免费，避免重启换 IP）</li>
+<li><strong>防火墙</strong>：出站需要开放 443 到 <code>api.openai.com</code>；入站仅需 SSH（22）</li>
+<li><strong>自动启动</strong>：用 systemd 或 cron 管理定时任务</li>
+<li><strong>磁盘清理</strong>：<code>~/.codex/sessions/</code> 会累积 rollout 文件，定期清理</li>
+</ol>
+<pre class="codehilite"><code class="language-bash"># 清理 30 天前的 session 文件
+find ~/.codex/sessions/ -type f -mtime +30 -delete
+</code></pre>
+
+<hr />
+<h3>场景 B：AWS EC2</h3>
+<p>适合需要更高性能、弹性伸缩或与 AWS 生态集成的场景。</p>
+<h4>系统要求</h4>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>最低</th>
+<th>推荐</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>实例类型</td>
+<td>t3.micro (2 vCPU, 1 GB)</td>
+<td>t3.medium (2 vCPU, 4 GB)</td>
+</tr>
+<tr>
+<td>AMI</td>
+<td>Ubuntu 22.04/24.04 或 Amazon Linux 2023</td>
+<td>Ubuntu 24.04 LTS</td>
+</tr>
+<tr>
+<td>Node.js</td>
+<td>18+</td>
+<td>22 LTS</td>
+</tr>
+<tr>
+<td>磁盘</td>
+<td>20 GB gp3</td>
+<td>50 GB gp3</td>
+</tr>
+<tr>
+<td>IAM Role</td>
+<td>—</td>
+<td>如需 S3 存取则配置</td>
+</tr>
+</tbody>
+</table>
+<h4>安装步骤</h4>
+<pre class="codehilite"><code class="language-bash"># === Ubuntu 22.04/24.04 ===
+sudo apt update &amp;&amp; sudo apt upgrade -y
+
+# 安装 Node.js
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs git
+
+# 安装 Codex
+npm install -g @openai/codex
+
+# 配置
+mkdir -p ~/.codex
+cat &gt; ~/.codex/config.toml &lt;&lt; 'EOF'
+preferred_auth_method = &quot;apikey&quot;
+model = &quot;gpt-5.3-codex&quot;
+model_reasoning_effort = &quot;high&quot;
+approval_policy = &quot;never&quot;
+sandbox_mode = &quot;workspace-write&quot;
+EOF
+
+export OPENAI_API_KEY=&quot;sk-...&quot;
+echo 'export OPENAI_API_KEY=&quot;sk-...&quot;' &gt;&gt; ~/.bashrc
+</code></pre>
+
+<pre class="codehilite"><code class="language-bash"># === Amazon Linux 2023 ===
+sudo dnf update -y
+sudo dnf install -y nodejs git
+
+# Node.js 版本可能偏旧，用 nvm 安装新版本
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+source ~/.bashrc
+nvm install 22
+nvm use 22
+
+npm install -g @openai/codex
+# 其余配置同上
+</code></pre>
+
+<h4>Sandbox 配置</h4>
+<pre class="codehilite"><code class="language-toml"># ~/.codex/config.toml — EC2 专用配置
+preferred_auth_method = &quot;apikey&quot;
+model = &quot;gpt-5.3-codex&quot;
+model_reasoning_effort = &quot;medium&quot;
+approval_policy = &quot;never&quot;
+sandbox_mode = &quot;workspace-write&quot;
+
+# 命名 profile，方便不同任务切换
+[profiles.review]
+approval_policy = &quot;never&quot;
+sandbox_mode = &quot;read-only&quot;
+model = &quot;gpt-5-codex-mini&quot;
+
+[profiles.fix]
+approval_policy = &quot;never&quot;
+sandbox_mode = &quot;workspace-write&quot;
+model = &quot;gpt-5.3-codex&quot;
+model_reasoning_effort = &quot;high&quot;
+</code></pre>
+
+<h4>EC2 systemd 服务（定时/触发式）</h4>
+<pre class="codehilite"><code class="language-ini"># /etc/systemd/system/codex-agent.service
+[Unit]
+Description=Codex CLI Agent Runner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ec2-user
+WorkingDirectory=/home/ec2-user/project
+Environment=&quot;OPENAI_API_KEY=sk-...&quot;
+ExecStart=/home/ec2-user/.nvm/versions/node/v22.0.0/bin/codex exec \
+  --profile fix \
+  &quot;Fix failing tests and create a PR with the changes&quot;
+
+[Install]
+WantedBy=multi-user.target
+</code></pre>
+
+<pre class="codehilite"><code class="language-bash"># 定时运行
+cat &gt; /etc/systemd/system/codex-agent.timer &lt;&lt; 'EOF'
+[Unit]
+Description=Run Codex agent every 30 minutes
+
+[Timer]
+OnCalendar=*:0/30
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now codex-agent.timer
+</code></pre>
+
+<h4>Codex + Bedrock 集成（EC2 专属优势）</h4>
+<p>在 EC2 上可直接接入 Amazon Bedrock，避免 OpenAI API 依赖：</p>
+<pre class="codehilite"><code class="language-toml"># ~/.codex/config.toml
+[model_providers.bedrock]
+name = &quot;AmazonBedrock&quot;
+base_url = &quot;https://bedrock-mantle.us-west-1.api.aws/v1&quot;
+env_key = &quot;CODEX_OPENAI_API_KEY&quot;
+
+[profiles.bedrock]
+model = &quot;openai.gpt-oss-120b&quot;
+model_provider = &quot;bedrock&quot;
+wire_api = &quot;responses&quot;  # Codex 默认使用 /v1/responses API
+</code></pre>
+
+<blockquote>
+<p>⚠️ 注意：需要先在 AWS Console 中申请 Bedrock 模型访问权限。</p>
+</blockquote>
+<hr />
+<h3>场景 C：GitHub Actions</h3>
+<p>Codex 提供官方 Action <code>openai/codex-action@v1</code>，是最简洁的 CI/CD 集成方式。</p>
+<h4>系统要求</h4>
+<ul>
+<li>GitHub 任意 plan（包括 Free）</li>
+<li>Runner：<code>ubuntu-latest</code>（推荐）或自定义 runner</li>
+<li>权限：<code>contents: read</code>（review）或 <code>contents: write</code>（auto-fix）</li>
+</ul>
+<h4>安装步骤（最小可用）</h4>
+<pre class="codehilite"><code class="language-yaml"># .github/workflows/codex-review.yml
+name: Codex PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Codex review
+        id: codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt: |
+            Review this pull request diff for:
+            1. Security vulnerabilities
+            2. Logic errors
+            3. Performance issues
+            4. Adherence to project conventions
+            Output a concise markdown report.
+          sandbox: read-only
+          safety-strategy: drop-sudo
+          effort: medium
+          output-file: review.md
+
+      - name: Post review
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-file: review.md
+</code></pre>
+
+<h4>Sandbox 配置</h4>
+<p>GitHub Actions 中的 sandbox 和 safety-strategy 是两层独立的防护：</p>
+<table>
+<thead>
+<tr>
+<th>sandbox</th>
+<th>文件访问</th>
+<th>网络</th>
+<th>适用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>read-only</code></td>
+<td>只读</td>
+<td>阻止</td>
+<td>Code review、分析</td>
+</tr>
+<tr>
+<td><code>workspace-write</code></td>
+<td>项目根可读写</td>
+<td>阻止</td>
+<td>Auto-fix、生成文档</td>
+</tr>
+<tr>
+<td><code>danger-full-access</code></td>
+<td>无限制</td>
+<td>无限制</td>
+<td>集成测试、部署</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>safety-strategy</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>drop-sudo</code>（默认）</td>
+<td>移除 sudo 权限，当前 job 内不可逆</td>
+</tr>
+<tr>
+<td><code>unprivileged-user</code></td>
+<td>以非 root 用户运行（需自托管 runner）</td>
+</tr>
+<tr>
+<td><code>unsafe</code></td>
+<td>无降权（仅 Windows，避免在共享 runner 使用）</td>
+</tr>
+</tbody>
+</table>
+<h4>GitHub Actions 工作流模式</h4>
+<p><strong>模式 1：PR Code Review 门禁</strong></p>
+<pre class="codehilite"><code class="language-yaml">name: Codex Quality Gate
+
+on:
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Quality scan
+        id: scan
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt: |
+            Analyse the diff. Output ONLY &quot;PASS&quot; if the code meets quality
+            standards, or &quot;FAIL: &lt;reason&gt;&quot; if it does not.
+          sandbox: read-only
+          effort: minimal  # 低延迟 + 低成本
+
+      - name: Enforce gate
+        run: |
+          RESULT=&quot;${{ steps.scan.outputs.final-message }}&quot;
+          if [[ &quot;$RESULT&quot; != PASS* ]]; then
+            echo &quot;::error::Quality gate failed: $RESULT&quot;
+            exit 1
+          fi
+</code></pre>
+
+<p><strong>模式 2：Auto-Fix 失败 CI</strong></p>
+<pre class="codehilite"><code class="language-yaml">name: Codex Auto-Fix
+
+on:
+  workflow_run:
+    workflows: [&quot;CI&quot;]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  fix:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Codex fix
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt: |
+            The CI workflow failed. Identify the minimal change needed
+            to make all tests pass. Implement only that change.
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+          effort: high
+
+      - run: npm test
+
+      - name: Open fix PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: codex/auto-fix-${{ github.run_id }}
+          title: &quot;fix: Codex auto-repair for CI failure&quot;
+          body: &quot;Automated fix. Review before merging.&quot;
+</code></pre>
+
+<p><strong>模式 3：矩阵并行（多服务）</strong></p>
+<pre class="codehilite"><code class="language-yaml">name: Parallel Service Review
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  review:
+    strategy:
+      matrix:
+        service: [auth, payments, notifications, search]
+      fail-fast: false  # 一个失败不影响其他
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Review ${{ matrix.service }}
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt: |
+            Review the code in services/${{ matrix.service }}/.
+            Focus on security, error handling, and test coverage.
+            Output a structured JSON report.
+          codex-args: &gt;-
+            [&quot;--output-schema-file&quot;, &quot;.github/codex/schemas/review.json&quot;]
+          sandbox: read-only
+          effort: medium
+          output-file: review-${{ matrix.service }}.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: review-${{ matrix.service }}
+          path: review-${{ matrix.service }}.json
+</code></pre>
+
+<p><strong>模式 4：结构化 JSON 输出门禁</strong></p>
+<pre class="codehilite"><code class="language-json">// .github/codex/schemas/review.json
+{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;required&quot;: [&quot;severity&quot;, &quot;issues&quot;, &quot;recommendation&quot;],
+  &quot;properties&quot;: {
+    &quot;severity&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;enum&quot;: [&quot;low&quot;, &quot;medium&quot;, &quot;high&quot;, &quot;critical&quot;]
+    },
+    &quot;issues&quot;: {
+      &quot;type&quot;: &quot;array&quot;,
+      &quot;items&quot;: {
+        &quot;type&quot;: &quot;object&quot;,
+        &quot;properties&quot;: {
+          &quot;file&quot;: { &quot;type&quot;: &quot;string&quot; },
+          &quot;line&quot;: { &quot;type&quot;: &quot;integer&quot; },
+          &quot;description&quot;: { &quot;type&quot;: &quot;string&quot; }
+        }
+      }
+    },
+    &quot;recommendation&quot;: { &quot;type&quot;: &quot;string&quot; }
+  }
+}
+</code></pre>
+
+<pre class="codehilite"><code class="language-yaml">- name: Security Scan
+  id: scan
+  uses: openai/codex-action@v1
+  with:
+    openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+    prompt-file: .github/codex/prompts/security-scan.md
+    codex-args: '[&quot;--output-schema-file&quot;, &quot;.github/codex/schemas/review.json&quot;]'
+    sandbox: read-only
+
+- name: Fail on critical
+  run: |
+    SEVERITY=$(echo '${{ steps.scan.outputs.final-message }}' | jq -r '.severity')
+    if [ &quot;$SEVERITY&quot; = &quot;critical&quot; ]; then
+      echo &quot;::error::Critical security issue found&quot;
+      exit 1
+    fi
+</code></pre>
+
+<hr />
+<h2>三、无头模式使用指南</h2>
+<h3><code>codex exec</code> 命令详解</h3>
+<pre class="codehilite"><code class="language-bash"># 基本用法
+codex exec &quot;Update the changelog for next release&quot;
+
+# 短别名
+codex e &quot;Fix all failing tests&quot;
+
+# 关键参数
+codex exec \
+  --model gpt-5.3-codex \          # 指定模型
+  --sandbox workspace-write \       # 沙箱模式
+  --approval-policy never \         # 无需确认（CI 必须）
+  --json \                          # JSON 行输出（CI 友好）
+  --output-last-message result.md \ # 最终消息写入文件
+  --ephemeral \                     # 不持久化 session
+  --skip-git-repo-check \           # 允许非 git 仓库
+  --profile ci \                    # 加载命名配置
+  &quot;Your prompt here&quot;
+</code></pre>
+
+<h3>审批策略</h3>
+<table>
+<thead>
+<tr>
+<th>策略</th>
+<th>行为</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>untrusted</code></td>
+<td>所有操作都需要确认</td>
+<td>高安全环境、首次使用</td>
+</tr>
+<tr>
+<td><code>on-request</code>（默认）</td>
+<td>Codex 判断是否需要确认</td>
+<td>日常开发</td>
+</tr>
+<tr>
+<td><code>never</code></td>
+<td>不询问，直接执行</td>
+<td>CI/CD、受控沙箱</td>
+</tr>
+<tr>
+<td><code>reject</code></td>
+<td>拒绝所有需要审批的操作</td>
+<td>纯分析场景</td>
+</tr>
+</tbody>
+</table>
+<pre class="codehilite"><code class="language-bash"># CI/CD 中必须设置 never + workspace-write
+codex exec --approval-policy never --sandbox workspace-write &quot;...&quot;
+
+# 或使用 --full-auto 快捷方式（= on-request + workspace-write）
+codex --full-auto &quot;refactor auth module&quot;
+</code></pre>
+
+<h3>无头模式与交互模式的差异</h3>
+<table>
+<thead>
+<tr>
+<th>特性</th>
+<th style="text-align: center;"><code>codex exec</code></th>
+<th style="text-align: center;"><code>codex</code>（交互）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TUI</td>
+<td style="text-align: center;">❌</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>多轮对话</td>
+<td style="text-align: center;">❌（单次执行）</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>Session 持久化</td>
+<td style="text-align: center;">可选 <code>--ephemeral</code></td>
+<td style="text-align: center;">✅ 自动</td>
+</tr>
+<tr>
+<td>JSON 输出</td>
+<td style="text-align: center;">✅ <code>--json</code></td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>审批中断</td>
+<td style="text-align: center;">❌（必须预设策略）</td>
+<td style="text-align: center;">✅ 运行时切换</td>
+</tr>
+<tr>
+<td>适合 CI/CD</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+</tbody>
+</table>
+<h3>从 exec 恢复 session</h3>
+<pre class="codehilite"><code class="language-bash"># 恢复最近 session
+codex exec resume --last
+
+# 恢复指定 session
+codex exec resume thr_abc123
+
+# 带新 prompt 恢复
+codex exec resume --last &quot;Continue the refactoring from where we left off&quot;
+</code></pre>
+
+<hr />
+<h2>四、成本估算</h2>
+<h3>订阅模式</h3>
+<table>
+<thead>
+<tr>
+<th>Plan</th>
+<th>月费</th>
+<th>Codex 消息 / 5h</th>
+<th>适合</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Free</td>
+<td>$0</td>
+<td>有限（推广期）</td>
+<td>尝试</td>
+</tr>
+<tr>
+<td>Go</td>
+<td>$8</td>
+<td>轻量级</td>
+<td>偶尔使用</td>
+</tr>
+<tr>
+<td>Plus</td>
+<td><strong>$20</strong></td>
+<td>45-225</td>
+<td>日常开发</td>
+</tr>
+<tr>
+<td>Pro</td>
+<td>$200</td>
+<td>300-1,500</td>
+<td>重度使用</td>
+</tr>
+<tr>
+<td>Business</td>
+<td>$25-30/用户</td>
+<td>45-225（同 Plus）</td>
+<td>团队合规</td>
+</tr>
+<tr>
+<td>Enterprise</td>
+<td>定制</td>
+<td>无固定限制（credits 池）</td>
+<td>大企业</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>5 小时滚动窗口</strong>：从首次消息起算，5 小时后重置。不是每日/每月。</p>
+</blockquote>
+<h3>API Key 按量计费</h3>
+<p>API 价格（2026 Q1）：</p>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>输入 / 1M tokens</th>
+<th>输出 / 1M tokens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>gpt-5.3-codex</td>
+<td>~$1.75</td>
+<td>~$14.00</td>
+</tr>
+<tr>
+<td>gpt-5.2-codex</td>
+<td>$1.25</td>
+<td>$10.00</td>
+</tr>
+<tr>
+<td>gpt-5-codex-mini</td>
+<td>$0.25</td>
+<td>$2.00</td>
+</tr>
+</tbody>
+</table>
+<h3>典型任务成本估算</h3>
+<table>
+<thead>
+<tr>
+<th>任务类型</th>
+<th>输入 tokens</th>
+<th>输出 tokens</th>
+<th style="text-align: center;">gpt-5.3-codex</th>
+<th style="text-align: center;">gpt-5-codex-mini</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Code review（PR ~200 行）</td>
+<td>~15K</td>
+<td>~5K</td>
+<td style="text-align: center;">$0.10</td>
+<td style="text-align: center;">$0.02</td>
+</tr>
+<tr>
+<td>Bug fix（单文件）</td>
+<td>~25K</td>
+<td>~10K</td>
+<td style="text-align: center;">$0.18</td>
+<td style="text-align: center;">$0.03</td>
+</tr>
+<tr>
+<td>Feature 开发（3-5 文件）</td>
+<td>~50K</td>
+<td>~25K</td>
+<td style="text-align: center;">$0.44</td>
+<td style="text-align: center;">$0.06</td>
+</tr>
+<tr>
+<td>大型重构（10+ 文件）</td>
+<td>~100K</td>
+<td>~50K</td>
+<td style="text-align: center;">$0.88</td>
+<td style="text-align: center;">$0.13</td>
+</tr>
+<tr>
+<td><strong>典型 session（30 分钟）</strong></td>
+<td><strong>~60K</strong></td>
+<td><strong>~30K</strong></td>
+<td style="text-align: center;"><strong>$0.53</strong></td>
+<td style="text-align: center;"><strong>$0.08</strong></td>
+</tr>
+</tbody>
+</table>
+<h3>订阅 vs API Break-even 分析</h3>
+<pre class="codehilite"><code>每月 session 数 &lt; 10-15  → API Key 更便宜
+每月 session 数 &gt; 15    → Plus ($20/mo) 更划算
+每天长 session &gt; 3-4    → Pro ($200/mo) 或考虑 API
+仅 CI/CD 不自己写代码    → API Key 更灵活
+</code></pre>
+
+<h3>基础设施成本</h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>规格</th>
+<th>月费</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lightsail（最小）</td>
+<td>1 vCPU, 2 GB RAM</td>
+<td><strong>$10</strong></td>
+</tr>
+<tr>
+<td>Lightsail（推荐）</td>
+<td>2 vCPU, 4 GB RAM</td>
+<td>$20</td>
+</tr>
+<tr>
+<td>EC2 t3.micro（spot）</td>
+<td>2 vCPU, 1 GB</td>
+<td>~$3-5</td>
+</tr>
+<tr>
+<td>EC2 t3.medium（按需）</td>
+<td>2 vCPU, 4 GB</td>
+<td>~$30</td>
+</tr>
+<tr>
+<td>GitHub Actions</td>
+<td>免费 2000 分钟/月（公开仓库）</td>
+<td>$0</td>
+</tr>
+</tbody>
+</table>
+<h3>总成本示例</h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>月均 API</th>
+<th>基础设施</th>
+<th>总计/月</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CI/CD (GH Actions, 每天 5 PR review)</td>
+<td>~$15</td>
+<td>$0</td>
+<td><strong>~$15</strong></td>
+</tr>
+<tr>
+<td>CI/CD (Lightsail, 每天 10 review + 5 fix)</td>
+<td>~$40</td>
+<td>$10</td>
+<td><strong>~$50</strong></td>
+</tr>
+<tr>
+<td>个人开发 (Plus + 偶尔 CI)</td>
+<td>$20</td>
+<td>$0-10</td>
+<td><strong>~$25</strong></td>
+</tr>
+<tr>
+<td>小团队 (Business × 5 + EC2 runner)</td>
+<td>~$200</td>
+<td>$30</td>
+<td><strong>~$230</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>五、已知坑点 &amp; 故障排查</h2>
+<h3>5.1 安装相关</h3>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>原因</th>
+<th>解决</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>EACCES</code> 权限错误</td>
+<td>npm 全局安装权限不足</td>
+<td><code>mkdir -p ~/.npm-global &amp;&amp; npm config set prefix ~/.npm-global</code>，不要 sudo</td>
+</tr>
+<tr>
+<td>Node.js 版本过低</td>
+<td>系统包管理器版本过旧</td>
+<td>用 NodeSource 或 nvm 安装 Node.js 22+</td>
+</tr>
+<tr>
+<td><code>npm install</code> 时 OOM</td>
+<td>低内存实例（&lt; 2 GB）</td>
+<td>升级实例或使用 GitHub Releases 预编译二进制</td>
+</tr>
+<tr>
+<td>WSL2 中无法访问</td>
+<td>Windows 文件系统性能差</td>
+<td>项目放 <code>/home/user/</code> 而非 <code>/mnt/c/</code></td>
+</tr>
+</tbody>
+</table>
+<h3>5.2 认证相关</h3>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>原因</th>
+<th>解决</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>无头服务器无法 OAuth</td>
+<td>无浏览器</td>
+<td>使用 API Key：<code>export OPENAI_API_KEY=sk-...</code></td>
+</tr>
+<tr>
+<td>OAuth token 过期</td>
+<td>默认有效期有限</td>
+<td>头环境中用 API Key，非交互模式强制 API Key</td>
+</tr>
+<tr>
+<td>API Key 不生效</td>
+<td>环境变量未正确设置</td>
+<td><code>echo $OPENAI_API_KEY</code> 验证；放在 <code>~/.codex/config.toml</code></td>
+</tr>
+<tr>
+<td>API 模型延迟可用</td>
+<td>API Key 比订阅晚几周更新模型</td>
+<td>关注 OpenAI 公告，或用 ChatGPT 订阅认证</td>
+</tr>
+</tbody>
+</table>
+<h3>5.3 Sandbox 相关</h3>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>原因</th>
+<th>解决</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Operation not permitted</code></td>
+<td>bubblewrap/Landlock 阻止了操作</td>
+<td>检查 <code>sandbox_mode</code> 设置，需要写权限时用 <code>workspace-write</code></td>
+</tr>
+<tr>
+<td>构建工具无法运行</td>
+<td>sandbox 阻止了 <code>/usr/bin</code> 之外的执行</td>
+<td>用 <code>danger-full-access</code>（仅可信环境）</td>
+</tr>
+<tr>
+<td>WSL2 中 Sandbox 不工作</td>
+<td>WSL2 内核对 bubblewrap 支持有限</td>
+<td>升级 WSL2 内核或关闭 sandbox</td>
+</tr>
+<tr>
+<td>容器中 sandbox 冲突</td>
+<td>Docker 嵌套 sandbox</td>
+<td>在 Docker 中运行 Codex 时设置 <code>--sandbox danger-full-access</code></td>
+</tr>
+</tbody>
+</table>
+<h3>5.4 运行相关</h3>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>原因</th>
+<th>解决</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5 小时窗口耗尽</td>
+<td>复杂任务消耗大量消息配额</td>
+<td>用更轻量的模型（gpt-5-codex-mini）或升级 plan；复杂任务用 <code>effort: high</code> 减少迭代轮次</td>
+</tr>
+<tr>
+<td>Session 数据过大</td>
+<td><code>~/.codex/sessions/</code> 未清理</td>
+<td>定期清理：<code>find ~/.codex/sessions/ -mtime +30 -delete</code></td>
+</tr>
+<tr>
+<td><code>codex exec</code> 卡住</td>
+<td>无审批策略时遇到需要确认的操作</td>
+<td>设置 <code>--approval-policy never</code></td>
+</tr>
+<tr>
+<td>网络超时</td>
+<td>OpenAI API 延迟</td>
+<td>增加超时：<code>export CODEX_REQUEST_TIMEOUT=300</code>；考虑区域近的部署</td>
+</tr>
+<tr>
+<td>Git 仓库检查失败</td>
+<td>非 git 目录运行</td>
+<td>加 <code>--skip-git-repo-check</code> 参数</td>
+</tr>
+</tbody>
+</table>
+<h3>5.5 GitHub Actions 专属</h3>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>原因</th>
+<th>解决</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>drop-sudo</code> 后后续步骤失败</td>
+<td>sudo 权限已被移除且不可逆</td>
+<td>需要 sudo 的步骤放新 job</td>
+</tr>
+<tr>
+<td>API Key 暴露</td>
+<td>硬编码在 workflow YAML 中</td>
+<td><strong>必须</strong>用 <code>${{ secrets.OPENAI_API_KEY }}</code></td>
+</tr>
+<tr>
+<td>Codex 输出未获取</td>
+<td>未使用 <code>outputs.final-message</code></td>
+<td>给 step 加 <code>id: codex</code>，然后 <code>${{ steps.codex.outputs.final-message }}</code></td>
+</tr>
+<tr>
+<td>fork PR 无法访问 secrets</td>
+<td>GitHub 安全限制</td>
+<td>用 <code>pull_request_target</code> 事件（注意安全风险）</td>
+</tr>
+</tbody>
+</table>
+<h3>5.6 成本相关</h3>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>原因</th>
+<th>解决</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>API 费用意外飙升</td>
+<td>复杂任务消耗 token 远超预期</td>
+<td>先用 <code>codex --model gpt-5-codex-mini</code> 试运行；在 prompt 加 <code>effort: minimal</code></td>
+</tr>
+<tr>
+<td>订阅 credits 快速耗尽</td>
+<td>cloud tasks 消耗比本地高 3-5x</td>
+<td>优先本地执行，仅必要时用 cloud sandbox</td>
+</tr>
+<tr>
+<td>Rolling window 不可预测</td>
+<td>复杂任务计数远高于简单任务</td>
+<td>监控 <code>/usage</code> 命令；复杂重构放在窗口开始时</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>六、安全最佳实践</h2>
+<pre class="codehilite"><code>1. API Key 管理
+   ├── 永远不硬编码在代码/配置文件中
+   ├── 使用环境变量或 GitHub Secrets
+   └── 不同环境用不同 Key（生产/开发分离）
+
+2. Sandbox 原则
+   ├── 默认使用 read-only
+   ├── 需要写时才用 workspace-write
+   └── danger-full-access 仅在隔离临时环境使用
+
+3. GitHub Actions
+   ├── safety-strategy: drop-sudo（默认）
+   ├── 公开仓库限制 allow-users
+   └── fork PR 用 pull_request_target 时额外审计
+
+4. 成本控制
+   ├── CI 高频任务用 gpt-5-codex-mini
+   ├── 定时清理 session 数据
+   └── 设置 OpenAI 使用上限（usage limits）
+</code></pre>
+
+<hr />
+<h2>七、快速参考卡片</h2>
+<pre class="codehilite"><code class="language-bash"># 安装
+npm install -g @openai/codex
+
+# 交互模式
+codex                              # 启动 TUI
+codex &quot;explain this code&quot;         # 直接提问
+codex -m gpt-5.3-codex            # 指定模型
+
+# 无头模式
+codex exec &quot;fix failing tests&quot;
+codex exec --json --ephemeral &quot;analyze this repo&quot;
+codex exec --approval-policy never --sandbox workspace-write &quot;...&quot;
+
+# 恢复会话
+codex resume --last
+codex resume thr_abc123
+
+# 模型
+/mode             # 切换模型（交互模式中）
+/model gpt-5.3-codex-spark
+
+# 状态
+/status           # 查看当前配置和用量
+/usage            # 查看 token 消耗
+/compact          # 压缩上下文
+
+# 配置
+~/.codex/config.toml    # 主配置文件
+AGENTS.md               # 项目指令（项目根目录）
+</code></pre>
+
+<hr />
+<p><em>指南完成。数据来源：OpenAI 官方文档、DeepWiki、社区指南、GitHub openai/codex、实测反馈。</em></p>
+</body>
+</html>

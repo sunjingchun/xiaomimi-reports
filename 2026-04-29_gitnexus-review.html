@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GitNexus 深度评测</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:800px;margin:0 auto;padding:20px;background:#1a1a2e;color:#e0e0e0;line-height:1.6}
+h1{color:#fd79a8;font-size:1.8em}h2{color:#00cec9;border-bottom:1px solid #2d3436;padding-bottom:8px;margin-top:32px}h3{color:#dfe6e9;margin-top:24px}h4{color:#fab1a0}
+table{width:100%;border-collapse:collapse;margin:16px 0}
+th{background:#2d3436;color:#00cec9;padding:10px 12px;text-align:left;font-size:14px}
+td{border-bottom:1px solid #2d3436;padding:8px 12px;font-size:14px}
+code{background:#2d3436;padding:2px 6px;border-radius:4px;font-size:13px;color:#fdcb6e}
+pre{background:#0a0a1a;padding:16px;border-radius:8px;overflow-x:auto;border:1px solid #2d3436;font-size:13px}
+pre code{background:transparent;padding:0;color:#dfe6e9}
+a{color:#74b9ff}
+strong{color:#ffeaa7}
+em{color:#81ecec}
+blockquote{border-left:3px solid #fd79a8;margin:16px 0;padding:8px 16px;background:#2d3436;border-radius:0 8px 8px 0}
+ul,ol{padding-left:24px}li{margin:6px 0}
+hr{border:none;border-top:1px solid #2d3436;margin:24px 0}
+</style>
+</head>
+<body>
+<h1>GitNexus 深度评测报告</h1>
+<blockquote>
+<p>评测日期：2026-04-29 | 评测对象：github.com/abhigyanpatwari/GitNexus
+评估目标：对 JC 的 picturebook-kg 项目（Next.js + Prisma + PostgreSQL 知识图谱）的适用性</p>
+</blockquote>
+<hr />
+<h2>一、项目概览</h2>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>数值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Stars</td>
+<td>32,827</td>
+</tr>
+<tr>
+<td>Forks</td>
+<td>3,723</td>
+</tr>
+<tr>
+<td>语言</td>
+<td>TypeScript</td>
+</tr>
+<tr>
+<td>许可证</td>
+<td>PolyForm Noncommercial 1.0.0</td>
+</tr>
+<tr>
+<td>创建时间</td>
+<td>2025-08-02</td>
+</tr>
+<tr>
+<td>维护者</td>
+<td>1 人（abhigyanpatwari）</td>
+</tr>
+<tr>
+<td>Open Issues</td>
+<td>218</td>
+</tr>
+<tr>
+<td>Open PRs</td>
+<td>126</td>
+</tr>
+</tbody>
+</table>
+<p><strong>一句话描述</strong>：将代码库索引为知识图谱（依赖关系、调用链、执行流），通过 MCP 协议暴露给 AI Agent 的零服务器代码智能引擎。</p>
+<p>核心理念：像 DeepWiki 一样理解代码，但更深——知识图谱追踪每个关系，不只是生成描述。</p>
+<hr />
+<h2>二、架构解析</h2>
+<h3>2.1 整体架构</h3>
+<pre class="codehilite"><code>源码目录 → 12阶段Pipeline DAG → LadybugDB(本地) → MCP/HTTP/CLI 三层查询接口
+</code></pre>
+
+<p><strong>两层产品形态</strong>：
+- <strong>CLI + MCP</strong>：<code>npm install -g gitnexus</code>，完整本地索引，支持全量仓库
+- <strong>Web UI</strong>：免安装浏览器模式（gitnexus.vercel.app），受浏览器内存限制（~5k 文件），或通过 <code>gitnexus serve</code> 桥接本地</p>
+<h3>2.2 Pipeline 12 阶段 DAG</h3>
+<pre class="codehilite"><code>scan → structure → [markdown, cobol] → parse → [routes, tools, orm]
+  → crossFile → mro → communities → processes
+</code></pre>
+
+<p><strong>关键阶段</strong>：
+- <code>parse</code>：Tree-sitter 原生绑定解析，生成 Symbol 节点 + IMPORTS/CALLS/EXTENDS 边
+- <code>routes</code>：Next.js/Expo/PHP 路由检测
+- <code>tools</code>：MCP/RPC tool 定义提取
+- <code>orm</code>：Prisma/Supabase ORM query 提取
+- <code>crossFile</code>：跨文件类型传播（拓扑序）
+- <code>mro</code>：方法解析顺序（MRO）、继承链
+- <code>communities</code>：Leiden 算法功能聚类
+- <code>processes</code>：执行流（Process）节点</p>
+<h3>2.3 存储引擎</h3>
+<ul>
+<li><strong>LadybugDB</strong>：嵌入式图数据库，本地存储于 <code>.gitnexus/lbug/</code></li>
+<li>单进程独占（分析时不能同时运行 MCP）</li>
+<li>索引元数据：<code>~/.gitnexus/registry.json</code>（多仓库注册表）</li>
+</ul>
+<h3>2.4 查询层</h3>
+<p><strong>16 个 MCP 工具</strong>（11 per-repo + 5 group）：
+- <code>query</code>：BM25 + 语义 + RRF 混合搜索
+- <code>context</code>：360° 符号视图（调用者/被调用者/流程参与）
+- <code>impact</code>：爆炸半径分析（深度分组 + 置信度）
+- <code>detect_changes</code>：Git diff → 受影响符号/流程映射
+- <code>rename</code>：图谱辅助多文件重命名（dry_run 预览）
+- <code>cypher</code>：原始 Cypher 图查询
+- <code>api_impact</code> / <code>route_map</code> / <code>tool_map</code> / <code>shape_check</code>：API 级别分析
+- 5 个 group 工具：多仓库合同提取与跨服务匹配</p>
+<p><strong>7 个 MCP Resources</strong>：仓库上下文、集群、流程、Schema 的即时访问</p>
+<p><strong>4 个自动安装的 Agent Skills</strong>：探索、影响分析、变更检测、重命名</p>
+<hr />
+<h2>三、支持的语言和框架</h2>
+<h3>3.1 Tree-sitter 原生支持</h3>
+<p>从 ARCHITECTURE.md 和 Pipeline 阶段可推断支持的语言（Tree-sitter 解析）：</p>
+<p><strong>强支持</strong>（有完整 AST 解析 + 调用解析 + 类型提取）：
+- TypeScript / JavaScript / TSX
+- Python
+- Ruby（有 LanguageProvider hooks）
+- Go
+- Rust
+- Java
+- C / C++
+- C#
+- PHP
+- COBOL（正则模式，非 tree-sitter）</p>
+<p><strong>框架检测</strong>：
+- Next.js 路由（<code>routes</code> 阶段）
+- Prisma ORM query（<code>orm</code> 阶段）
+- Supabase（<code>orm</code> 阶段）
+- Expo 路由
+- FastAPI / NestJS（部分检测，从 Issues 可见正在完善）</p>
+<h3>3.2 对 picturebook-kg 的覆盖度</h3>
+<table>
+<thead>
+<tr>
+<th>picturebook-kg 技术栈</th>
+<th>GitNexus 支持</th>
+<th>评估</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TypeScript</td>
+<td>✅ 原生支持</td>
+<td>完整 AST + 类型传播</td>
+</tr>
+<tr>
+<td>Next.js (App Router)</td>
+<td>✅ 路由检测</td>
+<td><code>routes</code> 阶段覆盖</td>
+</tr>
+<tr>
+<td>Prisma ORM</td>
+<td>✅ 查询检测</td>
+<td><code>orm</code> 阶段覆盖</td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td>⚠️ 间接受益</td>
+<td>Prisma schema 被解析，SQL 文件不解析</td>
+</tr>
+<tr>
+<td>React 组件</td>
+<td>✅ TSX 解析</td>
+<td>组件树关系可建模</td>
+</tr>
+<tr>
+<td>MDX/Markdown</td>
+<td>✅ 解析</td>
+<td><code>markdown</code> 阶段</td>
+</tr>
+</tbody>
+</table>
+<p><strong>结论</strong>：picturebook-kg 的核心技术栈被完全覆盖。</p>
+<hr />
+<h2>四、能力边界分析</h2>
+<h3>4.1 强场景 ✅</h3>
+<ol>
+<li><strong>大型单体仓库的调用链追踪</strong>：跨文件类型传播 + MRO + 流程检测，适合 Next.js 全栈项目</li>
+<li><strong>PR 爆炸半径分析</strong>：<code>impact</code> + <code>detect_changes</code> 组合，改 Prisma schema 时自动标出受影响的 API 路由和组件</li>
+<li><strong>重命名重构</strong>：<code>rename</code> 工具替代全局搜索替换，图谱保证完整性</li>
+<li><strong>多仓库微服务追踪</strong>：Group 功能可提取合同（API 接口定义），跨服务匹配消费者</li>
+<li><strong>Claude Code 深度集成</strong>：PreToolUse/PostToolUse hooks 自动注入图谱上下文，PostToolUse 检测索引过时</li>
+</ol>
+<h3>4.2 弱场景 ⚠️</h3>
+<ol>
+<li><strong>非 Tree-sitter 语言/DSL</strong>：SQL 原语（存储过程、视图）、GraphQL schema、Prisma schema 的具体字段关系不解析</li>
+<li><strong>运行时行为</strong>：只做静态分析，不追踪运行时调用（如动态 import、反射、eval）</li>
+<li><strong>外部服务依赖</strong>：PostgreSQL 数据库内关系、Redis 键依赖不可见</li>
+<li><strong>跨仓库非代码依赖</strong>：npm 包依赖关系不解析（只看 import 语句）</li>
+</ol>
+<h3>4.3 已知问题类型（从 Issues 快照推断）</h3>
+<p><strong>高频故障模式</strong>：
+- Windows 兼容性：<code>Invalid argument scope extraction failures</code>、<code>segfaults (0xC0000005)</code>
+- Tree-sitter 崩溃：大文件（&gt;34KB Python）触发 parser 崩溃
+- 跨文件链接误报：<code>runExactMatch</code> 产生 false-positive cross-links
+- 数据库锁冲突：MCP 与 analyze 同时运行导致 LadybugDB busy
+- CI/发布流程复杂：RC 自动发布 + 多 workflow 协调（说明项目活跃但工程复杂度较高）</p>
+<hr />
+<h2>五、MCP 集成实测分析</h2>
+<h3>5.1 集成方式</h3>
+<pre class="codehilite"><code class="language-bash"># Claude Code（最深）
+claude mcp add gitnexus -- npx -y gitnexus@latest mcp
+
+# Cursor
+# 写入 ~/.cursor/mcp.json
+
+# Codex
+codex mcp add gitnexus -- npx -y gitnexus@latest mcp
+
+# OpenCode
+# 写入 ~/.config/opencode/config.json
+</code></pre>
+
+<h3>5.2 Claude Code 专属能力</h3>
+<ul>
+<li><strong>PreToolUse hooks</strong>：在 Claude Code 执行搜索/编辑前，自动注入相关知识图谱上下文</li>
+<li><strong>PostToolUse hooks</strong>：检测提交后索引是否过时，提示 agent 重新索引</li>
+<li><strong>4 个自动安装的 skills</strong>（<code>.claude/skills/</code>）：探索、影响分析、变更检测、重命名</li>
+<li><strong><code>detect_impact</code> prompt</strong>：提交前自动分析变更影响范围</li>
+<li><strong><code>generate_map</code> prompt</strong>：从知识图谱生成架构文档 + Mermaid 图</li>
+</ul>
+<h3>5.3 社区反馈</h3>
+<p><strong>正面</strong>（从 README 引用和 Discord 社区推断）：
+- 32K+ Stars 说明社区认可度高
+- 官方 Discord 活跃，维护者响应快
+- 社区项目如 <code>pi-gitnexus</code> 和 <code>gitnexus-stable-ops</code> 说明生态在增长</p>
+<p><strong>负面/顾虑</strong>：
+- Issues 增长速度快（218 open），单维护者压力大
+- 大仓库索引慢（需 <code>--skip-embeddings</code> 加速）
+- 内存消耗高（analyze 自动 re-exec Node 扩大堆）
+- Windows 用户问题多（segfault、权限）</p>
+<hr />
+<h2>六、许可证风险分析</h2>
+<h3>6.1 PolyForm Noncommercial 1.0.0</h3>
+<p><strong>允许</strong>：
+- 个人研究、实验、学习
+- 慈善组织、教育机构、公共研究机构
+- 个人爱好项目，<strong>无预期商业应用</strong>
+- "fair use" 权利保留</p>
+<p><strong>禁止</strong>：
+- 任何形式的商业用途
+- 商业环境中的使用（即使不直接盈利）
+- 作为商业产品的一部分分发
+- 用于产生收入的任何场景</p>
+<p><strong>关键定义</strong>：
+- "Noncommercial purpose"：不主要指向商业利益或货币报酬
+- "Personal use"：无任何预期商业应用的私人用途</p>
+<h3>6.2 对 JC 的影响</h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>合规？</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>picturebook-kg 个人开发</td>
+<td>✅</td>
+<td>纯个人/学习项目</td>
+</tr>
+<tr>
+<td>picturebook-kg 将来商用</td>
+<td>❌</td>
+<td>需购买商业许可</td>
+</tr>
+<tr>
+<td>在 JC 的工作项目中使用</td>
+<td>❌</td>
+<td>商业环境</td>
+</tr>
+<tr>
+<td>为开源项目贡献代码</td>
+<td>✅</td>
+<td>非商业目的</td>
+</tr>
+</tbody>
+</table>
+<p><strong>风险评估</strong>：
+- <strong>当前阶段（个人项目）</strong>：无风险，完全合规
+- <strong>未来商业化信号</strong>：如果 picturebook-kg 有商业化计划，需提前联系 akonlabs.com 购买许可
+- <strong>许可不可撤销性</strong>：PolyForm 不提供"未来商用"预留，一旦依赖深度集成，迁移成本高</p>
+<h3>6.3 企业版</h3>
+<p>akonlabs.com 提供：
+- SaaS 或自托管部署
+- 商业 OSS 许可
+- PR Review 自动化、Auto-reindexing、多仓库支持</p>
+<p><strong>定价不透明</strong>：需联系 founders@akonlabs.com 获取报价。</p>
+<hr />
+<h2>七、单维护者风险评估</h2>
+<h3>7.1 维护现状</h3>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>评估</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>维护者</td>
+<td>1 人（abhigyanpatwari）</td>
+</tr>
+<tr>
+<td>Issues 积压</td>
+<td>218 open（活跃增长中）</td>
+</tr>
+<tr>
+<td>PR 积压</td>
+<td>126 open</td>
+</tr>
+<tr>
+<td>发布频率</td>
+<td>RC 每 push to main 自动发布（非常频繁）</td>
+</tr>
+<tr>
+<td>CI/CD</td>
+<td>高度自动化（多 workflow + concurrency 管控）</td>
+</tr>
+<tr>
+<td>社区</td>
+<td>Discord 活跃、社区贡献存在</td>
+</tr>
+</tbody>
+</table>
+<h3>7.2 风险评估</h3>
+<p><strong>风险点</strong>：
+- <strong>Bus Factor = 1</strong>：维护者不可用时项目停滞
+- <strong>Issues 增长速度 &gt; 关闭速度</strong>：218 open 且持续增长，说明维护带宽不足
+- <strong>Windows 兼容性问题多</strong>：影响部分用户群
+- <strong>企业版 vs OSS 版分歧</strong>：部分功能（PR Review、Multi-repo）仅在 Enterprise 版，可能影响 OSS 版维护优先级</p>
+<p><strong>有利因素</strong>：
+- CI/CD 高度自动化（RC 发布、Docker 构建、测试矩阵）
+- 社区有贡献者（126 PRs）
+- 项目有商业动机（akonlabs），维护者有财务激励继续维护
+- 代码质量高（从 ARCHITECTURE.md 和 GUARDRAILS.md 可见工程严谨性）</p>
+<p><strong>综合判断</strong>：
+项目质量高但依赖单一维护者是最大风险。好在有商业支撑（akonlabs），不太可能被废弃。但 feature request 响应速度可能随着 Issues 增长而下降。</p>
+<hr />
+<h2>八、对 picturebook-kg 的适用性评估</h2>
+<h3>8.1 匹配度分析</h3>
+<table>
+<thead>
+<tr>
+<th>需求维度</th>
+<th>GitNexus 适配度</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TypeScript/Next.js 代码理解</td>
+<td>⭐⭐⭐⭐⭐</td>
+<td>原生支持，路由 + 调用链全追踪</td>
+</tr>
+<tr>
+<td>Prisma Schema 变更影响</td>
+<td>⭐⭐⭐⭐</td>
+<td>ORM 查询检测 + impact 爆炸半径</td>
+</tr>
+<tr>
+<td>知识图谱可视化</td>
+<td>⭐⭐⭐⭐</td>
+<td>Web UI 图形探索 + Graph RAG Agent</td>
+</tr>
+<tr>
+<td>数据模型依赖追踪</td>
+<td>⭐⭐⭐</td>
+<td>Prisma schema 节点可追踪，但字段级关系弱</td>
+</tr>
+<tr>
+<td>API 路由 → 数据访问链路</td>
+<td>⭐⭐⭐⭐⭐</td>
+<td><code>route_map</code> + <code>api_impact</code> + Prisma query 检测</td>
+</tr>
+<tr>
+<td>PostgreSQL 数据库关系</td>
+<td>⭐</td>
+<td>不可见，静态分析无法理解 DB 内关系</td>
+</tr>
+<tr>
+<td>Markdown 文档关联</td>
+<td>⭐⭐⭐⭐</td>
+<td><code>markdown</code> 阶段解析，可关联到代码</td>
+</tr>
+</tbody>
+</table>
+<h3>8.2 核心价值场景</h3>
+<ol>
+<li><strong>改 Prisma schema 时自动分析影响</strong>：改一个 model 的字段 → <code>impact</code> 告诉你哪些 API route、组件、service 受影响</li>
+<li><strong>理解 Next.js 路由映射</strong>：<code>route_map</code> 展示 API route → handler → ORM query 完整链路</li>
+<li><strong>知识图谱与代码协同</strong>：<code>communities</code> 聚类可发现代码的功能分组，与 picturebook-kg 的知识域 mapping</li>
+<li><strong>Claude Code 联动</strong>：在 Claude Code 中直接使用图谱工具，自动注入上下文</li>
+</ol>
+<h3>8.3 不适用场景</h3>
+<ol>
+<li><strong>数据库内关系建模</strong>：picturebook-kg 的 PostgreSQL 图数据（实体→关系）是业务核心，GitNexus 不覆盖</li>
+<li><strong>外部知识源</strong>：绘本元数据、外部 API 数据不在 GitNexus 范围内</li>
+<li><strong>非代码知识图谱</strong>：业务逻辑层面的知识图谱仍需自建</li>
+</ol>
+<p><strong>结论</strong>：GitNexus 适合作为 picturebook-kg 的<strong>代码理解层</strong>，而不是替代其核心知识图谱功能。它让你更快理解"代码做了什么"，但不能替代"数据里有什么关系"。</p>
+<hr />
+<h2>九、安装测试建议</h2>
+<h3>9.1 快速试用（5 分钟内）</h3>
+<pre class="codehilite"><code class="language-bash"># 1. 安装（全局或 npx）
+npm install -g gitnexus
+
+# 2. 索引 picturebook-kg 仓库
+cd /path/to/picturebook-kg
+npx gitnexus analyze
+
+# 3. 配置 Claude Code MCP（一次性）
+npx gitnexus setup
+
+# 4. 或手动添加 MCP
+claude mcp add gitnexus -- npx -y gitnexus@latest mcp
+
+# 5. 查看索引状态
+npx gitnexus status
+
+# 6. 测试搜索
+npx gitnexus query &quot;Prisma schema&quot; --repo picturebook-kg
+</code></pre>
+
+<h3>9.2 索引期间注意事项</h3>
+<ul>
+<li><strong>首次索引耗时</strong>：中型 Next.js 项目预计 2-5 分钟</li>
+<li><strong>跳过嵌入加速</strong>：<code>npx gitnexus analyze --skip-embeddings</code></li>
+<li><strong>大文件超时</strong>：如遇 <code>worker parse timeout</code>，加 <code>--worker-timeout 60</code></li>
+<li><strong>内存</strong>：analyze 会 re-exec Node 扩大堆，确保有足够空闲内存</li>
+<li><strong>不要同时跑 analyze 和 MCP</strong>：LadybugDB 单进程锁</li>
+</ul>
+<h3>9.3 验证功能清单</h3>
+<ul>
+<li>[ ] <code>npx gitnexus query "绘本"</code> — 搜索是否命中相关代码</li>
+<li>[ ] <code>npx gitnexus context PrismaClient</code> — 符号上下文</li>
+<li>[ ] <code>npx gitnexus impact "绘本" --direction downstream</code> — 影响范围</li>
+<li>[ ] Claude Code 中测试 <code>detect_impact</code> prompt</li>
+<li>[ ] Web UI 打开 <code>gitnexus.vercel.app</code> 拖入仓库（如果 &lt;5k 文件）</li>
+</ul>
+<hr />
+<h2>十、综合评分</h2>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>评分</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>功能完整性</strong></td>
+<td>9/10</td>
+<td>MCP 工具链完整，Architecture 设计优雅</td>
+</tr>
+<tr>
+<td><strong>代码质量</strong></td>
+<td>8/10</td>
+<td>工程规范严谨，CI/CD 高度自动化，但 Issues 堆积</td>
+</tr>
+<tr>
+<td><strong>生态集成</strong></td>
+<td>9/10</td>
+<td>Claude Code 最深，Cursor/Codex/OpenCode/Windsurf 全支持</td>
+</tr>
+<tr>
+<td><strong>性能</strong></td>
+<td>7/10</td>
+<td>大仓库慢，需 <code>--skip-embeddings</code> 加速</td>
+</tr>
+<tr>
+<td><strong>稳定性</strong></td>
+<td>6/10</td>
+<td>Windows segfault、tree-sitter 崩溃、跨文件误报</td>
+</tr>
+<tr>
+<td><strong>维护可持续性</strong></td>
+<td>5/10</td>
+<td>单维护者，Issues 218 → 积压严重</td>
+</tr>
+<tr>
+<td><strong>许可证友好度</strong></td>
+<td>5/10</td>
+<td>PolyForm Noncommercial，商用需付费</td>
+</tr>
+<tr>
+<td><strong>对 picturebook-kg 适用性</strong></td>
+<td>7/10</td>
+<td>代码理解层匹配，但核心知识图谱仍需自建</td>
+</tr>
+</tbody>
+</table>
+<p><strong>加权总分：7.0/10</strong></p>
+<hr />
+<h2>十一、推荐度</h2>
+<h3>推荐：🍵 试用推荐（有条件推荐）</h3>
+<p><strong>推荐理由</strong>：
+1. picturebook-kg 技术栈（TypeScript + Next.js + Prisma）被完全覆盖
+2. MCP 集成到 Claude Code / OpenCode 的体验是同类产品中最好的
+3. 免费使用符合当前个人项目定位
+4. <code>impact</code> + <code>detect_changes</code> 工具对 Prisma schema 变更管理极有价值</p>
+<p><strong>前提条件</strong>：
+1. 接受 PolyForm Noncommercial 限制（个人项目期内 OK）
+2. 接受单维护者风险（有商业动机，不太可能被弃）
+3. 理解 GitNexus 是代码理解工具，不是知识图谱替代品
+4. Windows 不是 JC 的主力开发环境（Mac/mini + Win redmi 开发）</p>
+<h3>不推荐如果：</h3>
+<ul>
+<li>需要生产级稳定性保证（Issues 堆积是隐患）</li>
+<li>计划近期商业化 picturebook-kg（许可证墙）</li>
+<li>核心需求是数据库内关系建模（GitNexus 不覆盖）</li>
+</ul>
+<h3>建议行动路径</h3>
+<p><strong>短期（本周）</strong>：
+1. <code>npm install -g gitnexus</code> 试用
+2. 在 picturebook-kg 跑 <code>npx gitnexus analyze --skip-embeddings</code>
+3. 在 Claude Code 中验证 <code>detect_impact</code> + <code>query</code> 工具</p>
+<p><strong>中期（1个月）</strong>：
+4. 如体验好，加入官方 Discord 跟踪更新
+5. 定期关注 Issues 关闭速度（健康的维护信号）
+6. 评估 <code>--embeddings</code> 启用后对搜索质量的提升</p>
+<p><strong>长期</strong>：
+7. 如有商业化计划，联系 akonlabs 获取商业许可报价
+8. 对比同类工具（Sourcegraph、Aider 内置代码图谱）</p>
+<hr />
+<h2>附录 A：同类工具对比（简要）</h2>
+<table>
+<thead>
+<tr>
+<th>工具</th>
+<th>类型</th>
+<th>优点</th>
+<th>缺点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>GitNexus</strong></td>
+<td>本地 MCP 图谱</td>
+<td>Claude Code 深度集成、免费、offline</td>
+<td>单维护者、许可证限制</td>
+</tr>
+<tr>
+<td><strong>Sourcegraph</strong></td>
+<td>SaaS/自托管搜索</td>
+<td>企业级、多语言、Code Intel</td>
+<td>需部署、Cody 额外付费</td>
+</tr>
+<tr>
+<td><strong>Aider</strong></td>
+<td>LLM 编码助手</td>
+<td>仓库 map 自动生成、免费</td>
+<td>每次对话重新生成、非持久</td>
+</tr>
+<tr>
+<td><strong>Continue.dev</strong></td>
+<td>IDE 插件</td>
+<td>开源、可自托管、直觉 UI</td>
+<td>无知识图谱概念</td>
+</tr>
+<tr>
+<td><strong>Cody (Sourcegraph)</strong></td>
+<td>AI 编码助手</td>
+<td>企业级代码理解</td>
+<td>需 Sourcegraph 实例</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>附录 B：信息来源</h2>
+<ul>
+<li>GitNexus GitHub README、ARCHITECTURE.md、RUNBOOK.md、GUARDRAILS.md、CONTRIBUTING.md</li>
+<li>Issues 页面（2026-04-29 快照，218 open）</li>
+<li>PolyForm Noncommercial 1.0.0 许可证原文</li>
+<li>npm package page（gitnexus）</li>
+</ul>
+<p><em>注：Reddit、HackerNews、npm registry 因限流/403 无法访问，社区反馈基于 GitHub Issues 和文档推断。</em></p>
+</body>
+</html>
