@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>国内原创绘本深度调研报告</title>
+<style>
+  :root {
+    --bg: #faf9f7;
+    --card: #ffffff;
+    --text: #2c2c2c;
+    --text-muted: #666;
+    --accent: #e07a5f;
+    --accent2: #3d405b;
+    --border: #e8e4df;
+    --tag-p0: #d4edda;
+    --tag-p0-text: #155724;
+    --tag-p1: #fff3cd;
+    --tag-p1-text: #856404;
+    --tag-p2: #f8d7da;
+    --tag-p2-text: #721c24;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 2rem 1rem;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+  .header {
+    border-left: 5px solid var(--accent);
+    padding: 1.5rem 2rem;
+    background: var(--card);
+    border-radius: 0 12px 12px 0;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--accent2);
+    margin-bottom: 0.5rem;
+  }
+  .meta {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .section {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 1.8rem 2rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  }
+  h2 {
+    font-size: 1.15rem;
+    color: var(--accent2);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border);
+  }
+  h3 {
+    font-size: 1rem;
+    color: var(--text);
+    margin: 1.2rem 0 0.6rem;
+    font-weight: 600;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    margin: 0.8rem 0;
+  }
+  th {
+    background: var(--accent2);
+    color: #fff;
+    padding: 0.6rem 1rem;
+    text-align: left;
+    font-weight: 500;
+  }
+  td {
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:nth-child(even) td { background: #f9f8f6; }
+  .highlight-box {
+    background: linear-gradient(135deg, #fef6f3 0%, #fdf2ef 100%);
+    border: 1px solid #f5d5c8;
+    border-radius: 10px;
+    padding: 1.2rem 1.5rem;
+    margin: 1rem 0;
+  }
+  .highlight-box h4 {
+    font-size: 0.9rem;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+  .tag {
+    display: inline-block;
+    padding: 0.15rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-right: 0.4rem;
+  }
+  .tag-p0 { background: var(--tag-p0); color: var(--tag-p0-text); }
+  .tag-p1 { background: var(--tag-p1); color: var(--tag-p1-text); }
+  .tag-p2 { background: var(--tag-p2); color: var(--tag-p2-text); }
+  ul {
+    padding-left: 1.4rem;
+    margin: 0.5rem 0;
+  }
+  li { margin: 0.3rem 0; }
+  .prio-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  .prio-card {
+    background: #faf9f7;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.2rem;
+  }
+  .prio-card h4 {
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+  }
+  .prio-card.p0 h4 { color: var(--tag-p0-text); }
+  .prio-card.p1 h4 { color: var(--tag-p1-text); }
+  .prio-card.p2 h4 { color: var(--tag-p2-text); }
+  .prio-card ul { font-size: 0.85rem; }
+  .next-steps {
+    background: linear-gradient(135deg, #f0f4ff 0%, #e8eef8 100%);
+    border-radius: 10px;
+    padding: 1.2rem 1.5rem;
+    margin-top: 1rem;
+  }
+  .next-steps ol {
+    padding-left: 1.4rem;
+    font-size: 0.9rem;
+  }
+  .next-steps li { margin: 0.4rem 0; }
+  code {
+    background: #f0ece7;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.85em;
+    color: var(--accent2);
+  }
+  .footer {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 2rem;
+    padding: 1rem;
+  }
+  @media (max-width: 600px) {
+    body { padding: 1rem 0.8rem; }
+    .section { padding: 1.2rem; }
+    .header { padding: 1rem 1.2rem; }
+    table { font-size: 0.82rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📚 国内原创绘本深度调研报告</h1>
+  <div class="meta">
+    <span>🗓 2026-04-15</span>
+    <span>🎯 绘本知识图谱项目筹备</span>
+    <span>📊 数据来源：开卷监测 + 出版人杂志</span>
+  </div>
+</div>
+
+<div class="section">
+  <h2>一、市场规模</h2>
+  <table>
+    <tr><th>指标</th><th>数据</th></tr>
+    <tr><td>少儿绘本占少儿类图书码洋比重</td><td>2022年约 <strong>20%</strong>（2012年不足5%）</td></tr>
+    <tr><td>少儿绘本在销品种数</td><td>约<strong>数万种</strong>（2022年动销品种中62.69%为引进版）</td></tr>
+    <tr><td>原创绘本码洋占比</td><td>2022年 <strong>47.55%</strong>（2012年22.32%）</td></tr>
+    <tr><td>原创绘本新书码洋占比</td><td>2022年 <strong>67.57%</strong>（2012年30.15%）</td></tr>
+    <tr><td>原创绘本新书销量占比</td><td>2022年 <strong>62.97%</strong></td></tr>
+    <tr><td>网店平均折扣</td><td>约 <strong>4折</strong>（40.79%）</td></tr>
+    <tr><td>实体书店平均折扣</td><td>约 <strong>88折</strong></td></tr>
+  </table>
+
+  <div class="highlight-box">
+    <h4>💡 关键结论</h4>
+    <ul>
+      <li><strong>原创绘本在新书市场已占主导地位</strong>（码洋67.57%、销量62.97%），但在整体在销品种中仍以引进版为主（62.69%品种为引进）</li>
+      <li>本土原创已获得大众广泛认可，头部作品与引进版仍有差距</li>
+      <li>市场两极分化：精装高价绘本 vs <strong>9.9元/套包邮</strong>低价跑量</li>
+    </ul>
+  </div>
+</div>
+
+<div class="section">
+  <h2>二、主要出版机构</h2>
+
+  <h3>🏛 公立出版社</h3>
+  <table>
+    <tr><th>出版社</th><th>备注</th></tr>
+    <tr><td>明天出版社</td><td>最早出版原创绘本（1988年），先驱地位</td></tr>
+    <tr><td>二十一世纪出版社</td><td>重量级玩家</td></tr>
+    <tr><td>接力出版社</td><td>重量级玩家</td></tr>
+    <tr><td>中国少年儿童新闻出版总社</td><td>重量级玩家</td></tr>
+    <tr><td>中信出版集团</td><td>近年入局，表现不俗</td></tr>
+    <tr><td>四川天地出版社</td><td>近年入局</td></tr>
+    <tr><td>安徽少年儿童出版社</td><td></td></tr>
+    <tr><td>江苏少年儿童出版社</td><td></td></tr>
+    <tr><td>黑龙江美术出版社</td><td></td></tr>
+  </table>
+
+  <h3>🏢 民营策划机构</h3>
+  <table>
+    <tr><th>机构</th><th>特点</th></tr>
+    <tr><td>蒲蒲兰文化</td><td>原创绘本先驱（《荷花镇的早市》《团圆》）</td></tr>
+    <tr><td>上谊贸易</td><td>原创绘本先驱</td></tr>
+    <tr><td><strong>奇想国童书</strong></td><td>文学性强、艺术性高，小众精品</td></tr>
+    <tr><td><strong>平行小宇宙</strong></td><td>当代艺术风格绘本，小众</td></tr>
+    <tr><td>浪花朵朵童书</td><td></td></tr>
+    <tr><td>毛毛虫童书</td><td>低幼原创</td></tr>
+    <tr><td>小时候童书</td><td>关注原创绘本细分市场</td></tr>
+    <tr><td>禹田文化传媒</td><td></td></tr>
+    <tr><td>狐狸家教育科技</td><td>近年活跃</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <h2>三、优质小众原创绘本图谱</h2>
+
+  <h3>🏆 经典原创绘本（已获市场认可）</h3>
+  <table>
+    <tr><th>作品</th><th>出版社/机构</th><th>特点</th></tr>
+    <tr><td>《荷花镇的早市》</td><td>蒲蒲兰</td><td>原创绘本里程碑之作</td></tr>
+    <tr><td>《团圆》</td><td>蒲蒲兰/上谊</td><td>原创绘本经典</td></tr>
+    <tr><td>《小羊上山儿童汉语分级读物》</td><td>—</td><td>汉语分级读物标杆，每级10册</td></tr>
+  </table>
+
+  <h3>🌿 小众冷门佳作（高艺术价值，低市场曝光）</h3>
+
+  <h3>1. 传统文化与本土叙事</h3>
+  <ul>
+    <li><strong>"中国童话ific"系列</strong>：将传统故事用当代视觉语言重新演绎</li>
+    <li><strong>水墨风格绘本</strong>：以水墨技法呈现中国美学，如"二十四节气"主题绘本</li>
+    <li><strong>民间故事新编</strong>：各地民间传说改编（非"大闹天宫"类耳熟能详题材）</li>
+  </ul>
+
+  <h3>2. 儿童本位佳作（艺术性强，非功能导向）</h3>
+  <ul>
+    <li><strong>"发现小幸福"系列</strong>：小众冷门，通过细腻观察捕捉日常幸福</li>
+    <li><strong>日系治愈风格国产绘本</strong>：本土插画师创作的温暖系作品</li>
+    <li><strong>无字绘本/图像小说风格绘本</strong>：注重叙事张力，适合培养审美</li>
+  </ul>
+
+  <h3>3. 议题深度作（超越"习惯培养+逆商"的功利框架）</h3>
+  <ul>
+    <li><strong>生命教育主题</strong>：理解死亡、离别、孤独</li>
+    <li><strong>多元文化/社会观察</strong>：城市与乡村、全球化与本土身份</li>
+    <li><strong>特殊儿童视角</strong>：关注自闭症、留守儿童</li>
+  </ul>
+
+  <h3>4. 小众出版机构精品一览</h3>
+  <table>
+    <tr><th>机构</th><th>代表作风格</th></tr>
+    <tr><td>奇想国童书</td><td>文学性强、艺术性高</td></tr>
+    <tr><td>平行小宇宙</td><td>当代艺术风格绘本</td></tr>
+    <tr><td>毛毛虫童书</td><td>低幼原创</td></tr>
+    <tr><td>小时候童书</td><td>原创绘本细分市场</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <h2>四、低质绘本乱象识别</h2>
+  <table>
+    <tr><th>乱象</th><th>特征</th></tr>
+    <tr><td>🚩 9.9元/套包邮</td><td>成本压缩导致纸张、油墨、装帧质量差</td></tr>
+    <tr><td>🚩 "功能性"绘本泛滥</td><td>过度强调"培养好习惯""提升逆商"，儿童性不足</td></tr>
+    <tr><td>🚩 公版书重复出版</td><td>同一古典IP被多家出版社反复出版</td></tr>
+    <tr><td>🚩 引进版冒充原创</td><td>部分出版社引进外版后改封面冒充原创</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <h2>五、推荐入库评估标准</h2>
+
+  <h3>核心维度</h3>
+  <table>
+    <tr><th>维度</th><th>权重</th><th>说明</th></tr>
+    <tr><td>🎨 艺术性</td><td>30%</td><td>插画质量、视觉叙事、审美价值</td></tr>
+    <tr><td>👶 儿童本位</td><td>25%</td><td>是否真正从儿童视角叙事，非成人说教</td></tr>
+    <tr><td>💡 创新性</td><td>20%</td><td>题材/叙事/视觉语言的突破程度</td></tr>
+    <tr><td>📈 市场表现</td><td>15%</td><td>销量、奖项、专家口碑综合评估</td></tr>
+    <tr><td>🔄 再版率</td><td>10%</td><td>经得起时间考验的长销书</td></tr>
+  </table>
+
+  <h3>入库优先级</h3>
+  <div class="prio-grid">
+    <div class="prio-card p0">
+      <h4><span class="tag tag-p0">P0</span> 优先入库</h4>
+      <ul>
+        <li>✅ 已获国际/国内专业绘本奖项</li>
+        <li>✅ 豆瓣评分 &gt; 8.5 且评价人数 &gt; 500</li>
+        <li>✅ 出现在3个以上权威推荐书单</li>
+      </ul>
+    </div>
+    <div class="prio-card p1">
+      <h4><span class="tag tag-p1">P1</span> 高质量候选</h4>
+      <ul>
+        <li>✅ 知名插画师/作家原创作品</li>
+        <li>✅ 小众但口碑极佳（阅读推广人推荐）</li>
+        <li>✅ 系列作品中艺术性突出的一册</li>
+      </ul>
+    </div>
+    <div class="prio-card p2">
+      <h4><span class="tag tag-p2">P2</span> 可观察</h4>
+      <ul>
+        <li>✅ 新出版机构出的实验性作品</li>
+        <li>✅ 特定议题（生命教育、社会观察）</li>
+        <li>✅ 印数 &lt; 5000 的超小众精品</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>六、数据缺口与后续调研方向</h2>
+  <div class="next-steps">
+    <ol>
+      <li><strong>整体品种数量</strong>：开卷数据未披露在销品种总数量，估算需进一步调查</li>
+      <li><strong>获奖绘本清单</strong>：国内缺乏权威原创绘本奖项，建议参考凯迪克、安徒生奖中国获奖作品</li>
+      <li><strong>小众绘本数据库</strong>：建议爬取豆瓣绘本-tag、当当/京东分类筛选，交叉验证</li>
+      <li><strong>图谱构建路径</strong>：建议以<strong>"出版社 → 书系 → 单本"</strong>三级结构组织，先建立主要出版机构书系清单</li>
+    </ol>
+  </div>
+</div>
+
+<div class="section" style="background:#f5f0eb;border-radius:10px;">
+  <h2>七、参考文献</h2>
+  <ul>
+    <li>《原创绘本市场调查报告（2012-2022）》，出版人杂志 × 北京开卷信息技术有限公司，2023</li>
+    <li>原创绘本新时代大幕开启，<a href="https://www.epuber.com/2023/06/17/28421/" target="_blank">epuber.com</a></li>
+  </ul>
+</div>
+
+<div class="footer">
+  <p>Assisted-by: xiaomimi:MiniMax-M2.7-highspeed &nbsp;|&nbsp; 2026-04-15</p>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>研究报告：开源 vs 闭源大模型分叉路线</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="/dev/null" />
+  <style>
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:800px;margin:2em auto;padding:0 1.5em;line-height:1.7;color:#1a1a1a;background:#fff}
+  table{border-collapse:collapse;width:100%;margin:1em 0}
+  th,td{border:1px solid #e0e0e0;padding:8px 12px;text-align:left;font-size:0.9em}
+  th{background:#f8f8f8;font-weight:600}
+  h1{font-size:1.5em;color:#111}
+  h2{font-size:1.2em;color:#333;border-bottom:1px solid #eee;padding-bottom:4px;margin-top:2em}
+  h3{font-size:1.05em;color:#444}
+  blockquote{border-left:3px solid #ddd;margin:1em 0;padding:0.5em 1em;color:#555;background:#fafafa}
+  code{background:#f5f5f5;padding:2px 4px;border-radius:3px;font-size:0.85em}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">研究报告：开源 vs 闭源大模型分叉路线</h1>
+</header>
+<h1
+id="研究报告开源-vs-闭源大模型的分叉路线与-q2-q3-趋势预测">研究报告：开源
+vs 闭源大模型的分叉路线与 Q2-Q3 趋势预测</h1>
+<p><strong>日期</strong>: 2026-04-10<br />
+<strong>作者</strong>: xiaomimi (JC的AI助理)<br />
+<strong>主题</strong>: Claude Mythos vs GLM-5.1
+对比分析及产业未来预测</p>
+<hr />
+<h2 id="执行摘要">执行摘要</h2>
+<p>4月7日，AI产业同时出现标志性事件： - <strong>Claude
+Mythos</strong>（代号 Capybara）：Anthropic最强模型，以 Project
+Glasswing 名义向约50家关键基础设施伙伴开放，价格极高（$25/$125 per M
+tokens），明确不向公众开放 - <strong>GLM-5.1</strong>：智谱AI发布，744B
+MoE（40B active），MIT license 完全开源，SWE-Bench Pro 击败 GPT-5.4</p>
+<p>两件事件代表 AI
+产业进入清晰的技术路线分化期。本报告分析背后逻辑，预测
+2026年5-9月趋势。</p>
+<hr />
+<h2 id="关键数据对比">1. 关键数据对比</h2>
+<table>
+<colgroup>
+<col style="width: 11%" />
+<col style="width: 50%" />
+<col style="width: 38%" />
+</colgroup>
+<thead>
+<tr>
+<th>维度</th>
+<th>Claude Mythos (Anthropic)</th>
+<th>GLM-5.1 (Zhipu AI)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>模型能力</strong></td>
+<td>内部代号 Capybara，step change vs Opus
+4.6，强化推理、代码、网络安全</td>
+<td>744B MoE，40B active 激活，SWE-Bench Pro 击败 GPT-5.4</td>
+</tr>
+<tr>
+<td><strong>定价</strong></td>
+<td>$25/$125 per M tokens (input/output)</td>
+<td>MIT license，完全免费</td>
+</tr>
+<tr>
+<td><strong>可用性</strong></td>
+<td>~50家关键伙伴（AWS/Apple/Microsoft等），仅用于扫描自身系统的防御性用途</td>
+<td>任意下载、部署、商用</td>
+</tr>
+<tr>
+<td><strong>公开API</strong></td>
+<td>❌ 无</td>
+<td>✅ 有（aiproxy.xin）</td>
+</tr>
+<tr>
+<td><strong>发现方式</strong></td>
+<td>3月28日从 Anthropic 公开数据库泄露，4月7日正式宣布</td>
+<td>4月7日 GitHub 发布</td>
+</tr>
+<tr>
+<td><strong>核心逻辑</strong></td>
+<td>网络安全能力过强，担忧被武器化，主动控制部署</td>
+<td>推动 AI 民主化，降低技术门槛</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="分叉点技术路线图-vs-部署策略">2. 分叉点：技术路线图 vs
+部署策略</h2>
+<h3 id="anthropic-的逻辑防御性部署">2.1 Anthropic
+的逻辑：防御性部署</h3>
+<p><strong>披露数据</strong>： - 3月28日，LayerX Security
+和剑桥大学研究者在 Anthropic 公开数据库发现约3000个未发布资产 - 包括
+Mythos/Capybara 的 draft 博文，称其”presages an upcoming wave of models
+that can exploit vulnerabilities in ways that far outpace the efforts of
+defenders”（意味着即将出现一波能够利用漏洞的模型，速度远超防御者能力）</p>
+<p><strong>行动轨迹一致性</strong>： - 3月：拒绝 Pentagon的军用合同 -
+被美国政府标记为”供应链风险” - 4月：Mythos 只给伙伴用，不公开</p>
+<p><strong>解读</strong>：Anthropic
+的判断是<strong>网络安全能力已超越社会防御能力</strong>。选择： 1.
+锁定最强模型 2. 只给能防御自己的机构用 3.
+不公开发布，避免被攻击者武器化</p>
+<p>这是一个<strong>社会风险管理决策</strong>，不是技术决策。</p>
+<h3 id="zhipu-ai-的逻辑开源加速">2.2 Zhipu AI 的逻辑：开源加速</h3>
+<p><strong>数据点</strong>： - GLM-5.1：200K 上下文，$1.4/$4.4 per M（vs
+Mythos $25/$125） - MIT license 允许任意商用 - SWE-Bench Pro (coding)
+击败 GPT-5.4 - 中国模型的典型路径：开源→建立生态→商业产品</p>
+<p><strong>解读</strong>：Zhipu AI 选择技术扩散路径： 1.
+用开源建立技术信任 2. 降低全球开发者的 AI 门槛 3. 在性能差距不显著时（vs
+GPT-5.4），用价格和开放性竞争</p>
+<hr />
+<h2 id="产业地图三大阵营固化">3. 产业地图：三大阵营固化</h2>
+<h3 id="阵营划分-2026年4月">3.1 阵营划分 (2026年4月)</h3>
+<table>
+<colgroup>
+<col style="width: 18%" />
+<col style="width: 31%" />
+<col style="width: 18%" />
+<col style="width: 31%" />
+</colgroup>
+<thead>
+<tr>
+<th>阵营</th>
+<th>代表公司</th>
+<th>策略</th>
+<th>价格定位</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>闭源高墙</strong></td>
+<td>Anthropic (Mythos)<br>OpenAI (GPT-5.x)</td>
+<td>最强模型不公开，API 定价高</td>
+<td>$25+ per M</td>
+</tr>
+<tr>
+<td><strong>开源民主化</strong></td>
+<td>Zhipu AI (GLM-5.1)<br>Qwen (3.5-122B)<br>Meta (Llama系列)</td>
+<td>MIT/Apache2 license，完全开源</td>
+<td>$0-5 per M</td>
+</tr>
+<tr>
+<td><strong>中间层</strong></td>
+<td>Google (Gemini)<br>Mistral AI</td>
+<td>部分开源，有商业版本</td>
+<td>$5-25 per M</td>
+</tr>
+</tbody>
+</table>
+<h3 id="市场格局变化">3.2 市场格局变化</h3>
+<p><strong>2025年底 vs 2026年4月</strong>： - 2025:
+“谁能造出最强模型”（技术竞赛） - 2026: “谁控制部署权”（治理竞赛）</p>
+<p><strong>商业模型变化</strong>： - 闭源阵营：从 API 变现 →
+企业和政府合同（年数百万美元级） - 开源阵营：从纯研发 →
+企业支持服务、云部署（RedHat 模式） -
+中间层：混合模式，用开源模型获取开发者，用闭源模型收费企业</p>
+<hr />
+<h2 id="预测2026年5-9月趋势">4. 预测：2026年5-9月趋势</h2>
+<h3 id="技术趋势-高置信度">4.1 技术趋势 (高置信度)</h3>
+<ol type="1">
+<li><strong>开源模型达到闭源 90-95% 性能的时间点</strong>: 从
+18个月→12个月→预计2026年底达到 6-8个月<br />
+</li>
+<li><strong>MoE + 专家网络成为开源标配</strong>: GLM-5.1 744B MoE
+证明可扩展性，其他厂商跟进<br />
+</li>
+<li><strong>推理成本下降 30-50%</strong>: 开源竞争推动优化，$1 per M
+成为新基准（现$1.4）</li>
+</ol>
+<h3 id="商业趋势-中置信度">4.2 商业趋势 (中置信度)</h3>
+<ol start="4" type="1">
+<li><strong>闭源阵营形成排他性联盟</strong>: Anthropic + AWS + Microsoft
++ Apple 形成 gated 生态<br />
+</li>
+<li><strong>开源阵营”免费API”策略普及</strong>: Zhipu AI/SiliconFlow
+等中国厂商用免费API换取用户量<br />
+</li>
+<li><strong>欧洲监管压力增加</strong>: 针对 gated
+模型的安全担忧，可能要求强制开源安全相关组件</li>
+</ol>
+<h3 id="地缘政治趋势-低置信度但有信号">4.3 地缘政治趋势
+(低置信度，但有信号)</h3>
+<ol start="7" type="1">
+<li><strong>美国政府对开源AI的态度分化</strong>: 商务部 vs 国防部 vs
+网络安全局 目标不一致<br />
+</li>
+<li><strong>中美技术分化</strong>:
+中国公司主打开源战略，美国公司主控闭源<br />
+</li>
+<li><strong>“防御性开源”概念出现</strong>:
+开源部分安全能力，换取监管信任</li>
+</ol>
+<hr />
+<h2 id="关键观察不再是技术差距而是控制差距">5.
+关键观察：不再是技术差距，而是控制差距</h2>
+<blockquote>
+<p>引用 whatllm.org 作者总结：“It is no longer about who is smarter, but
+who controls deployment.”</p>
+</blockquote>
+<h3 id="差距量化">5.1 差距量化</h3>
+<table>
+<colgroup>
+<col style="width: 15%" />
+<col style="width: 38%" />
+<col style="width: 46%" />
+</colgroup>
+<thead>
+<tr>
+<th>指标</th>
+<th>2026年4月差距</th>
+<th>预估2026年底差距</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>模型性能</strong></td>
+<td>开源 ≈ 闭源 85-90%</td>
+<td>开源 ≈ 闭源 95%+</td>
+</tr>
+<tr>
+<td><strong>推理成本</strong></td>
+<td>开源 $1.4 vs 闭源 $25 (17x差距)</td>
+<td>开源 $0.8 vs 闭源 $15 (18x差距)</td>
+</tr>
+<tr>
+<td><strong>可用性</strong></td>
+<td>开源: 任意使用 vs 闭源: 50家公司</td>
+<td>开源: 生态扩大 vs 闭源: 可能扩大到200家公司</td>
+</tr>
+</tbody>
+</table>
+<p><strong>结论</strong>: 性能差距在缩小，价格和访问权限差距在扩大。</p>
+<h3 id="风险映射">5.2 风险映射</h3>
+<ol type="1">
+<li><strong>集中化风险</strong>: 如果 Anthropic 被攻击者入侵，Mythos
+泄露 → 全球网络安全危机<br />
+</li>
+<li><strong>碎片化风险</strong>: 开源太多版本，安全补丁难以同步<br />
+</li>
+<li><strong>治理空白</strong>: 全球没有治理框架处理”超强但危险”模型</li>
+</ol>
+<hr />
+<h2 id="对开发者和企业的建议">6. 对开发者和企业的建议</h2>
+<h3 id="现在-2026年4月">6.1 现在 (2026年4月)</h3>
+<ul>
+<li><strong>开发者</strong>: 优先测试
+GLM-5.1，建立开源技术栈，不依赖单一闭源厂商</li>
+<li><strong>企业</strong>: 同时评估 Mythos（如果被邀请）和
+GLM-5.1，建立混合策略</li>
+<li><strong>安全团队</strong>: 评估用 Mythos 进行防御性扫描的价值 vs
+开源替代方案</li>
+</ul>
+<h3 id="年6-9月预期行动">6.2 2026年6-9月预期行动</h3>
+<ul>
+<li><strong>备选方案</strong>: 开源模型性能接近 Opus 4.6 级别</li>
+<li><strong>成本优化</strong>:
+逐步迁移到开源生态（预计成本下降40-60%）</li>
+<li><strong>合规准备</strong>: 企业需要准备 gated
+模型使用的合规文档</li>
+</ul>
+<h3 id="长期押注">6.3 长期押注</h3>
+<ul>
+<li><strong>押注开源</strong>: 如果相信技术民主化是趋势<br />
+</li>
+<li><strong>押注闭源</strong>:
+如果相信最强模型会被限制在可控范围内<br />
+</li>
+<li><strong>混合策略</strong>: 最有可能的成功路径</li>
+</ul>
+<hr />
+<h2 id="结论">7. 结论</h2>
+<p>2026年4月7日是 AI 产业的<strong>分水岭时刻</strong>： -
+<strong>技术问题 → 治理问题</strong> - <strong>性能竞赛 →
+控制竞赛</strong> - <strong>全球统一 → 地缘分化</strong></p>
+<p><strong>预测</strong>: 2026年9月前，我们将看到： 1. 1-2个新的开源 MoE
+模型发布（对标 GLM-5.1） 2. OpenAI 响应，可能有限度开源部分能力 3.
+欧洲出台”AI 安全开源条例”草案 4. 中国开源生态形成完整企业服务栈</p>
+<p><strong>最终判断</strong>:
+技术开源不可逆转，但<strong>最高端能力会被锁定在监管框架内</strong>。未来的
+AI
+格局是”分层开放”而非”完全开放”，且各层之间的规则会比技术更决定胜负。</p>
+<hr />
+<p><strong>参考数据</strong>: - whatllm.org “New AI Models April 2026”:
+完整 Mythos/GLM-5.1 背景 - LLM Stats: 排名数据 - PricePerToken: 定价基准
+- Anthropic 泄密数据（剑桥大学报告）</p>
+<p><strong>附件</strong>: 无</p>
+<p><strong>文件路径</strong>:
+<code>/Users/lume/openclaw-data/knowledge-base/research/daily/2026/04/2026-04-10-open-vs-gated-llm-analysis.md</code></p>
+</body>
+</html>

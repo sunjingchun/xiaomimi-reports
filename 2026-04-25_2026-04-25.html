@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>深度调研：LLM 评估新范式 — MathDuels 自博弈Benchmark</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #fafafa;
+    color: #222;
+    line-height: 1.6;
+  }
+  h1 {
+    font-size: 1.6em;
+    color: #1a1a2e;
+    border-bottom: 3px solid #4a4ae8;
+    padding-bottom: 8px;
+    margin-bottom: 16px;
+  }
+  h2 {
+    font-size: 1.2em;
+    color: #333;
+    margin-top: 24px;
+  }
+  .importance {
+    background: #e8f0fe;
+    border-left: 4px solid #4a4ae8;
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .importance strong { color: #1a1a2e; }
+  ul { padding-left: 20px; }
+  li { margin-bottom: 8px; }
+  .paper-box {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+  }
+  .paper-title {
+    font-weight: bold;
+    font-size: 1.05em;
+    color: #1a1a2e;
+    margin-bottom: 4px;
+  }
+  .paper-meta {
+    color: #666;
+    font-size: 0.85em;
+    margin-bottom: 10px;
+  }
+  .key-points { color: #333; }
+  .key-points li::marker { color: #4a4ae8; }
+  .limitations {
+    background: #fff3e0;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-top: 10px;
+  }
+  .limitations::before { content: "⚠️ "; }
+  .limitations-title {
+    color: #e65100;
+    font-weight: bold;
+    font-size: 0.9em;
+    margin-bottom: 4px;
+  }
+  .verdict {
+    background: #f1f8e9;
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 20px;
+  }
+  .verdict h2 { margin-top: 0; color: #2e7d32; }
+  .verdict p { margin: 8px 0; }
+  .footer {
+    text-align: center;
+    color: #999;
+    font-size: 0.8em;
+    margin-top: 30px;
+    border-top: 1px solid #eee;
+    padding-top: 16px;
+  }
+</style>
+</head>
+<body>
+
+<h1>🤖 LLM 评估新范式：自博弈Benchmark MathDuels</h1>
+
+<div class="importance">
+<p><strong>为什么重要</strong></p>
+<p>当前数学基准（MATH, GSM8K）已接近饱和，顶级模型准确率超95%，无法区分能力差距。传统评估只测"解题"，忽略模型能否<strong>原创有价值的问题</strong>——这是智力的两个核心维度。MathDuels 通过让模型同时扮演出题者和解题者，首次实现评估的动态进化。</p>
+</div>
+
+<h2>📄 核心论文解读</h2>
+
+<div class="paper-box">
+<div class="paper-title">论文一：MathDuels — Evaluating LLMs as Problem Posers and Solvers</div>
+<div class="paper-meta">
+  arXiv:2604.21916 · cs.CL · 2026-04-23<br>
+  作者：Zhiqiu Xu 等（加州大学尔湾分校 + 联合团队）<br>
+  顶会：无明确 venue（arXiv 预印）
+</div>
+
+<ul class="key-points">
+  <li><strong>核心机制</strong>：19个前沿模型互相出题 + 互相解题，三阶段生成管线（meta-prompting → 问题生成 → 难度放大），独立 verifier 过滤无效问题</li>
+  <li><strong>关键发现</strong>：出题能力与解题能力<strong>部分解耦</strong>——某些模型解题强但出题弱，某些反之。单一角色评估会遗漏这些差异</li>
+  <li><strong>动态天花板</strong>：随着更强模型加入，它们出的题能击败之前顶级解题模型，基准难度随参与者水平共同进化，不会饱和</li>
+  <li><strong>方法论</strong>：Rasch 模型联合估计求解者能力和问题难度，作者质量由其出题造成的击败率推导</li>
+</ul>
+
+<div class="limitations">
+<div class="limitations-title">局限性</div>
+<p>仅覆盖数学领域，泛化到其他领域（如代码、推理）尚需验证；Rasch 模型假设可能不完全匹配 LLM 行为；自博弈可能存在自我强化偏差。</p>
+</div>
+</div>
+
+<div class="paper-box">
+<div class="paper-title">论文二：GiVA — Gradient-Informed Bases for Vector-Based Adaptation</div>
+<div class="paper-meta">
+  arXiv:2604.21901 · cs.CL · 2026-04-23<br>
+  作者：Neeraj Gangwar 等<br>
+  <strong>顶会：AISTATS 2026</strong> ✅
+</div>
+
+<ul class="key-points">
+  <li><strong>问题</strong>：LoRA 已是参数高效微调标准，但向量类方法（Vector-based Adaptation，如 AdaLoRA 的向量变体）需要更高 rank 才能匹配 LoRA 性能，成本反而更高</li>
+  <li><strong>方案</strong>：GiVA 用梯度信息初始化向量适配器，将 rank 需求降低 <strong>8倍</strong>，训练时间与 LoRA 持平，同时保持极端参数效率</li>
+  <li><strong>验证</strong>：跨越自然语言理解（NLU）、自然语言生成（NLG）、图像分类多个基准一致优于或匹配现有方法</li>
+</ul>
+
+<div class="limitations">
+<div class="limitations-title">局限性</div>
+<p>实验主要集中在 Transformer 架构；对非标准任务（如长文本）的泛化待验证；8倍 rank 降低的具体数值可能随模型规模变化。</p>
+</div>
+</div>
+
+<h2>🔗 相关工作</h2>
+<ul>
+  <li><strong>动态评估</strong>：LiveBench、GPQA Diamond 等尝试随模型进化难度，但 MathDuels 是首个完全由模型互相对抗生成的基准</li>
+  <li><strong>参数高效微调</strong>：LoRA 生态（QLoRA, DoRA）、向量方法（AdaLoRA, Layerwise）等持续迭代，GiVA 是初始化策略的创新</li>
+  <li><strong>LLM 作为评估者</strong>：Pythia, BIG-Bench 的子集持续探索；MathDuels 的双角色设计填补了出题能力评估的空白</li>
+</ul>
+
+<h2>💡 我的判断</h2>
+
+<div class="verdict">
+<p>MathDuels 是近期最有创意的评估设计——它抓住了"会出题才能真正测出能力"这个洞察。传统基准的饱和是真实问题，自博弈解决了天花板问题。值得跟踪 leaderboard 的发展。</p>
+<p>GiVA 则是工程友好的改进：参数高效微调在边侧部署场景至关重要，8倍 rank 降低意味着同等硬件可微调更大模型，或同等模型用更少参数。当前 LoRA 仍是主流，但 GiVA 这类初始化优化值得集成到工作流。</p>
+<p>两个工作共同指向一个趋势：<strong>评估和训练方法正在从"固定题目刷分"转向"对抗性、动态、能力解耦"</strong>。</p>
+</div>
+
+<div class="footer">
+  调研时间：2026-04-25 · 数据来源：arXiv cs.CL 24 Apr 2026<br>
+  本期扫描 25 篇，深度分析 2 篇
+</div>
+
+</body>
+</html>

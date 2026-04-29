@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>深度调研：LLM 推理机制的范式重构——从浅层 CoT 到潜在空间优化</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.7; max-width: 800px; margin: 0 auto; padding: 20px; background: #1a1a2e; color: #e0e0e0; }
+  h1 { font-size: 2.2em; color: #e94560; border-bottom: 3px solid #e94560; padding-bottom: 10px; }
+  h2 { font-size: 1.5em; color: #0f3460; background: #e94560; display: inline-block; padding: 5px 15px; border-radius: 4px; margin-top: 30px; color: #fff; }
+  h3 { color: #e94560; margin-top: 20px; }
+  p { margin: 10px 0; }
+  strong { color: #fff; }
+  .highlight { background: #16213e; padding: 15px; border-left: 4px solid #e94560; border-radius: 0 8px 8px 0; margin: 15px 0; }
+  .highlight p { margin: 5px 0; }
+  .pro { color: #4ecca3; }
+  .con { color: #ff6b6b; }
+  ul { padding-left: 20px; }
+  li { margin: 8px 0; }
+  .paper-card { background: #16213e; border-radius: 8px; padding: 15px 20px; margin: 15px 0; border: 1px solid #0f3460; }
+  .paper-card h3 { margin-top: 0; }
+  .paper-card .venue { display: inline-block; background: #e94560; color: #fff; font-size: 0.8em; padding: 2px 8px; border-radius: 3px; margin-left: 8px; }
+  .paper-card .tag-code { display: inline-block; background: #4ecca3; color: #1a1a2e; font-size: 0.8em; padding: 2px 8px; border-radius: 3px; margin-left: 8px; }
+  .paper-card .tag-survey { display: inline-block; background: #ffd93d; color: #1a1a2e; font-size: 0.8em; padding: 2px 8px; border-radius: 3px; margin-left: 8px; }
+  .divider { border: none; border-top: 1px solid #0f3460; margin: 25px 0; }
+  .summary-box { background: #0f3460; border-radius: 8px; padding: 15px 20px; margin: 15px 0; }
+  .summary-box p { margin: 5px 0; }
+  @media (prefers-color-scheme: light) {
+    body { background: #f8f9fa; color: #333; }
+    h1 { color: #e94560; border-bottom-color: #e94560; }
+    h2 { background: #e94560; color: #fff; }
+    h3 { color: #e94560; }
+    .highlight, .paper-card, .summary-box { background: #fff; border-color: #ddd; }
+    strong { color: #222; }
+  }
+</style>
+</head>
+<body>
+
+<h1>🧠 LLM 推理机制的范式重构：从浅层 CoT 到潜在空间优化</h1>
+
+<div class="highlight">
+<p><strong>为什么重要：</strong>2026 年 Q1-Q2 的顶级会议论文（ICLR 2026、ACL 2026、TMLR 2026）集中冲击了一个核心问题：<strong>LLM 的推理能力到底来自哪里？</strong>三篇立场/理论论文从不同角度质疑了现有的 CoT 解释框架，而一系列新方法（梯度下降、test-time training、轨迹操控）正在将推理从「在文本空间搜索」推进到「在表征空间优化」。这直接影响到我们如何训练、评估和使用推理模型。</p>
+</div>
+
+<h2>📌 核心论文解读</h2>
+
+<div class="paper-card">
+<h3>1. ∇-Reasoner: LLM Reasoning via Test-Time Gradient Descent in Latent Space <span class="venue">ICLR 2026</span></h3>
+<p><strong>作者：</strong>Peihao Wang, Ruisi Cai, Zhen Wang, Hongyuan Mei, Qiang Liu, Pan Li, Zhangyang Wang</p>
+
+<p><strong>核心贡献：</strong></p>
+<ul>
+  <li>提出 Differentiable Textual Optimization (DTO)，在解码循环中对 token logits 执行可微优化</li>
+  <li>利用 LLM 自身似然 + reward model 的梯度信号，在 <strong>潜在空间</strong> 而非离散 token 空间中 refinement</li>
+  <li>理论证明：test-time 梯度下降 = KL 正则化 RL (RLHF) 的对偶形式——<span class="pro">首次在理论上桥接了推理时优化与对齐训练</span></li>
+  <li>数学推理 benchmark 上准确率提升 <strong>20%+</strong>，同时减少 10-40% 的模型调用次数</li>
+  <li>核心范式转变：<strong>从零阶搜索（sampling/beam search）到一阶优化（gradient descent）</strong></li>
+</ul>
+
+<p><span class="con">⚠️ 局限性：</span></p>
+<ul>
+  <li>需要额外的 reward model 提供梯度信号，增加了推理时的依赖</li>
+  <li>梯度计算带来额外的内存和计算开销，在超大规模模型上尚未验证</li>
+  <li>对 reward model 质量敏感：reward hacking 问题可能被梯度放大</li>
+</ul>
+</div>
+
+<div class="paper-card">
+<h3>2. LLM Reasoning Is Latent, Not the Chain of Thought <span class="tag-survey">Position Paper</span></h3>
+<p><strong>作者：</strong>Wenshuo Wang</p>
+
+<p><strong>核心贡献：</strong></p>
+<ul>
+  <li>形式化三个假设：H1（推理=潜在状态轨迹）、H2（推理=显式 CoT 文本）、H0（推理增益来自序列计算量，而非表征对象）</li>
+  <li>系统性地梳理现有实证、机制解释和综述工作，并用受控实验分离三者</li>
+  <li>结论：<span class="pro">当前证据最支持 H1</span>——推理主要发生在潜在表征空间，CoT 文本仅是副产品</li>
+  <li>两项建议：①以潜在状态动态为默认研究对象；②评估推理时应显式分离 CoT 文本、潜在状态和序列计算量</li>
+</ul>
+
+<p><span class="con">⚠️ 局限性：</span></p>
+<ul>
+  <li>自身是 position paper，没有提出新方法或新实验</li>
+  <li>H1 被表述为「默认工作假设」而非定论，强调任务依赖性</li>
+  <li>目前缺乏标准工具来直接观测潜在状态轨迹</li>
+</ul>
+</div>
+
+<div class="paper-card">
+<h3>3. LLM Reasoning as Trajectories: Step-Specific Representation Geometry <span class="venue">ACL 2026 Main</span></h3>
+<p><strong>作者：</strong>Lihao Sun, Hang Dong, Bo Qiao, Qingwei Lin, Dongmei Zhang, Saravan Rajmohan (Microsoft)</p>
+
+<p><strong>核心贡献：</strong></p>
+<ul>
+  <li>发现数学推理在表征空间中遍历<strong>功能有序、分步特异的子空间</strong>，层越深分离度越高</li>
+  <li><span class="pro">推理训练主要加速了向终止相关子空间的收敛，而非引入新的表征组织</span></li>
+  <li>正确/错误解在后期步才系统性分岔——可在推理中途预测最终答案正确性（ROC-AUC 达 0.87）</li>
+  <li>提出 trajectory-based steering：基于「理想轨迹」做推理时的纠正和长度控制</li>
+</ul>
+
+<p><span class="con">⚠️ 局限性：</span></p>
+<ul>
+  <li>仅在数学推理场景验证（MATH/GSM8K），通用性待检验</li>
+  <li>轨迹操控需要预先定义「理想轨迹」，可能不适用于开放域推理</li>
+  <li>分析基于特定模型架构，跨架构的可迁移性未知</li>
+</ul>
+</div>
+
+<div class="paper-card">
+<h3>4. TEMPO: Scaling Test-time Training for Large Reasoning Models</h3>
+<p><strong>作者：</strong>Qingyang Zhang, Xinke Kong, Haitao Wu 等</p>
+
+<p><strong>核心贡献：</strong></p>
+<ul>
+  <li>指出现有 test-time training (TTT) 方法存在<strong>性能平台期</strong>和<strong>多样性坍缩</strong>问题</li>
+  <li>根源：policy 更新后，自生成的 reward signal 产生 drift，无外部校准</li>
+  <li>提出 EM 视角下的交替框架：policy refinement ⟷ critic recalibration（用小量标注数据周期校准评估器）</li>
+  <li><span class="pro">OLMO3-7B 在 AIME 2024 从 33.0% → 51.1%；Qwen3-14B 从 42.3% → 65.8%</span></li>
+</ul>
+
+<p><span class="con">⚠️ 局限性：</span></p>
+<ul>
+  <li>依赖少量但高质量的标注数据用于 critic recalibration</li>
+  <li>EM 过程理论上需多次迭代，实际部署时成本可能较高</li>
+  <li>多样性维持的长期效果有待验证（是否延缓了坍缩而非解决）</li>
+</ul>
+</div>
+
+<h2>📚 相关工作</h2>
+
+<div class="paper-card">
+<h3>5. Barriers to Universal Reasoning With Transformers (发布日：2026-04-28)</h3>
+<p><strong>作者：</strong>Oliver Kraus, Yash Sarrof, Yuekun Yao, Alexander Koller, Michael Hahn</p>
+<p>理论论文，证明在有限字母表 + 标准位置编码下，带 CoT 的 Transformer 在「长度泛化」要求下表达能力限于 TC⁰。提出 signpost token + value change encoding 策略来解决重复复制和最后出现检索障碍。<span class="tag-code">有代码</span></p>
+</div>
+
+<div class="paper-card">
+<h3>6. How Fast Should a Model Commit to Supervision? (发布日：2026-04-28)</h3>
+<p><strong>作者：</strong>Chu-Cheng Lin, Eugene Ie</p>
+<p>利用 Tsallis log-loss 连续体统一 RLVR (q=0) 和最大似然 (q=1)，提出两种估算器 GARL 和 PAFT。在冷启动时，密度估计极逃逸时间 O(log(1/p₀)) 远超 RL 极 O(1/p₀)。在 FinQA/HotPotQA/MuSiQue 上验证 q=0.75 有效缓解冷启动停滞。</p>
+</div>
+
+<div class="paper-card">
+<h3>7. Large Language Model Reasoning Failures <span class="venue">TMLR 2026</span> <span class="tag-survey">Survey</span></h3>
+<p><strong>作者：</strong>Peiyang Song, Pengrui Han, Noah Goodman</p>
+<p>首个系统性 LLM 推理失败综述。将推理分为具身/非具身、非形式/形式推理，故障分为三类：架构内禀缺陷、领域特定限制、鲁棒性问题。附带 GitHub 资源库。<span class="tag-code">有代码</span></p>
+</div>
+
+<div class="paper-card">
+<h3>8. Recursive Multi-Agent Systems (发布日：2026-04-28)</h3>
+<p><strong>作者：</strong>Xiyuan Yang, Jiaru Zou, Pan Lu, James Zou 等</p>
+<p>将递归/循环语言模型从单模型扩展到多 agent 系统。通过 RecursiveLink 模块实现跨 agent 潜在状态传递，内外双循环联合优化。9 个 benchmark 上平均准确率+8.3%，推理加速 1.2-2.4x，token 使用减少 35-76%。<span class="tag-code">有代码</span></p>
+</div>
+
+<h2>💡 我的判断</h2>
+
+<div class="summary-box">
+<p><strong>趋势判断：</strong></p>
+<ul>
+  <li><strong>✅ 潜在空间推理是 2026 年的主线。</strong> ICLR + ACL + TMLR 的集中发表不是巧合——∇-Reasoner 和 Trajectories 论文从截然不同的角度（梯度下降 vs 表征分析）得出了 convergent 结论：<strong>推理发生在潜在表征空间，CoT 只是「转录」</strong>。</li>
+  <li><strong>⚠️ 训练层面的影响：</strong> Tsallis loss 工作 (Paper 6) 指出了 RLVR 冷启动的根本问题，意味着未来的 reasoning post-training 可能不再一头扎进 RL，而是混合使用密度估计目标来突破冷启动。TEMPO (Paper 4) 的 EM 视角提示 TTT 需要周期性校准，单靠 self-reward 不可持续。</li>
+  <li><strong>🔴 理论约束不容忽视：</strong> Barriers to Universal Reasoning (Paper 5) 从理论指出 CoT 的长度泛化能力存在 TC⁰ 极限。这为当前「越长 CoT 越好」的经验主义敲了警钟——架构层面的创新（而非仅靠推理时 compute scaling）是必要的。</li>
+  <li><strong>🟡 实际落地建议：</strong>
+    <ul>
+      <li>训练阶段：考虑使用 <strong>GARL at q≈0.75</strong>（Tsallis loss）替代纯 RLVR 来避免冷启动</li>
+      <li>推理阶段：<strong>trajectory steering</strong> (Paper 3) 比重复采样开销更小，值得关注后期工程化</li>
+      <li>评估阶段：简单看 CoT 准确率不够，需要分离潜在状态表征质量（Paper 2 的建议）</li>
+    </ul>
+  </li>
+  <li><strong>🟢 长期判断：</strong> 「推理=潜在轨迹」范式一旦确立，将冲击 bench 设计、模型架构和 interpretability 方法。但转捩点在于能否在标准 eval 框架中统一三者（CoT 文本、潜在状态、计算量），这可能需要 1-2 年的标准化过程。</li>
+</ul>
+</div>
+
+<hr class="divider">
+<p style="color: #888; font-size: 0.85em; text-align: center;">自动生成 | 2026-04-29 | 数据来源：arXiv cs.AI/cs.CL/cs.LG, Papers With Code</p>
+
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>深度调研：隐空间推理 — 让 LLM 不写作文也能思考</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #c9d1d9; padding: 20px; line-height: 1.7; }
+  .container { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 1.6em; color: #58a6ff; border-left: 4px solid #58a6ff; padding-left: 14px; margin: 20px 0 12px; }
+  h2 { font-size: 1.2em; color: #f0883e; margin: 24px 0 10px; padding-bottom: 4px; border-bottom: 1px solid #30363d; }
+  p { margin: 8px 0; }
+  .highlight { background: #1a2332; border: 1px solid #30363d; border-radius: 8px; padding: 14px 16px; margin: 12px 0; }
+  .highlight strong { color: #58a6ff; }
+  ul { margin: 8px 0 8px 20px; }
+  li { margin: 6px 0; }
+  .paper { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px 16px; margin: 12px 0; }
+  .paper-title { color: #58a6ff; font-weight: 700; font-size: 1.05em; }
+  .paper-meta { color: #8b949e; font-size: 0.85em; margin: 4px 0; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin: 2px 4px 2px 0; }
+  .tag-venue { background: #1f4e1f; color: #7ee787; }
+  .tag-arch { background: #1e3a5f; color: #79c0ff; }
+  .tag-efficiency { background: #5c3b1a; color: #f0883e; }
+  .tag-risk { background: #5c1a1a; color: #ff7b72; }
+  .pros { color: #7ee787; }
+  .cons { color: #ff7b72; }
+  .my-take { background: linear-gradient(135deg, #1a2332 0%, #1e2a3a 100%); border: 1px solid #30363d; border-radius: 8px; padding: 14px 16px; margin: 12px 0; }
+  .section-divider { border: 0; height: 1px; background: #30363d; margin: 20px 0; }
+  .emoji-bullet { margin-right: 6px; }
+  .data-point { color: #f0883e; font-weight: 700; }
+  .footer { color: #484f58; font-size: 0.78em; text-align: center; margin-top: 32px; padding-top: 16px; border-top: 1px solid #30363d; }
+  a { color: #58a6ff; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>🧠 隐空间推理：让 LLM 不写作文也能思考</h1>
+
+<div class="highlight">
+<strong>为什么重要</strong><br>
+Chain-of-Thought（CoT）是当前 LLM 复杂推理的标准范式，但它有一个根本矛盾：推理质量与 token 成本正相关。本周 arXiv 上出现了一个突破性方向——<strong>Abstract Chain-of-Thought</strong>，用离散隐空间 token 替代自然语言长链推理，在保持精度的前提下将推理 token 减少 <span class="data-point">11.6倍</span>。这标志着推理效率军备竞赛进入了「去语言化」阶段。
+</div>
+
+<h2>📌 核心论文解读</h2>
+
+<div class="paper">
+<div class="paper-title">Thinking Without Words: Efficient Latent Reasoning with Abstract Chain-of-Thought</div>
+<div class="paper-meta">
+  arXiv:2604.22709 · Keshav Ramji, Tahira Naseem, Ramón Fernandez Astudillo · IBM Research<br>
+  <span class="tag tag-arch">新架构</span>
+  <span class="tag tag-efficiency">推理效率</span>
+</div>
+
+<h3 style="color:#c9d1d9; font-size:1em; margin:10px 0 6px;">核心技术点</h3>
+<ul>
+  <li><strong>Abstract-CoT 机制</strong>：模型在生成最终答案前，先生成一段由"保留词汇表"组成的<strong>离散隐 token 序列</strong>（而非自然语言 CoT）。这些 token 只在模型内部有意义，人类不可读。</li>
+  <li><strong>策略迭代式预热训练（Policy Iteration Warm-up）</strong>：交替执行 (1) 从完整 CoT 做 masking bottleneck → SFT；(2) 用 constrained decoding 自蒸馏，让模型仅从 prompt 生成抽象 token。</li>
+  <li><strong>强化学习精调</strong>：预热后，用 warm-started RL 在约束解码下优化抽象序列的生成策略。</li>
+  <li><span class="data-point">11.6× 推理 token 压缩</span>：在数学推理（GSM8K/MATH）、指令跟随、多跳推理上保持与完整 CoT 可比精度。</li>
+  <li><strong>涌现幂律分布</strong>：抽象词汇表呈现类似自然语言的 Zipfian 分布，且在不同训练阶段演化。这意味着模型自发学会了结构化的"内部语言"。</li>
+  <li><strong>跨模型家族泛化</strong>：方法在不同 LLM 架构上均有效。</li>
+</ul>
+
+<h3 style="color:#ff7b72; font-size:1em; margin:10px 0 6px;">⚠️ 局限性</h3>
+<ul>
+  <li class="cons"><span class="emoji-bullet">🔴</span> 可解释性丧失：抽象 token 人类不可读，无法审计推理过程——这在安全敏感场景是硬伤。</li>
+  <li class="cons"><span class="emoji-bullet">🔴</span> 训练成本不低：策略迭代预热 + RL 精调两步走，并非即插即用。</li>
+  <li class="cons"><span class="emoji-bullet">🔴</span> 泛化边界未验证：在需要世界知识或长程推理的任务上（如法律分析、科学发现），抽象 token 是否仍有效未知。</li>
+  <li class="cons"><span class="emoji-bullet">🔴</span> 精度仍有差距：论文说的是"comparable performance"，不是超越。</li>
+</ul>
+</div>
+
+<h2>🔗 相关工作</h2>
+
+<div class="paper">
+<div class="paper-title">Introducing Background Temperature to Characterise Hidden Randomness in LLMs</div>
+<div class="paper-meta">
+  arXiv:2604.22411 · Alberto Messina, Stefano Scotta<br>
+  <span class="tag tag-venue">TMLR 2026</span>
+</div>
+<p>即使设 temperature=0，LLM 对同一输入仍可产生不同输出——这是因为浮点运算非结合性、batch size 变化等底层实现噪声。作者提出 <strong>"背景温度" T_bg</strong> 概念：将这种实现层面的随机性形式化为等效温度，并提供经验估算协议。对隐空间推理方向有直接启示：如果抽象 token 的生成受 T_bg 影响，推理一致性如何保证？</p>
+</div>
+
+<div class="paper">
+<div class="paper-title">Preference Heads in Large Language Models: A Mechanistic Framework for Interpretable Personalization</div>
+<div class="paper-meta">
+  arXiv:2604.22345 · Weixu Zhang et al.<br>
+  <span class="tag tag-venue">ACL 2026</span>
+</div>
+<p>通过因果 masking 分析定位 Transformer 中的 <strong>Preference Heads</strong>（偏好注意力头），提出 Differential Preference Steering (DPS)：无需训练的推理时个性化方案。与 Abstract-CoT 形成互补——一个研究 LLM <em>如何</em>思考，一个研究 LLM <em>偏好什么</em>。</p>
+</div>
+
+<div class="paper">
+<div class="paper-title">When Does LLM Self-Correction Help? A Control-Theoretic Markov Diagnostic</div>
+<div class="paper-meta">arXiv:2604.22273 · Aofan Liu, Jingxiang Meng</div>
+<p>将 LLM 自我纠错建模为控制论反馈回路，提出简洁诊断规则：<strong>仅在 ECR/EIR > Acc/(1-Acc) 时迭代</strong>。在 7 个模型、3 个数据集上发现 EIR（错误引入率）存在尖锐近零阈值——超过即恶化。这对隐空间推理的验证机制有参考价值。</p>
+</div>
+
+<div class="paper">
+<div class="paper-title">Agentic World Modeling: Foundations, Capabilities, Laws, and Beyond</div>
+<div class="paper-meta">arXiv:2604.22748 · Meng Chu et al.（35+ 位作者）</div>
+<p>关于 Agent 世界模型的全面综述，涵盖基础、能力、定律。隐空间推理天然适合作为世界模型的内部推理引擎——用抽象 token 模拟物理/社会动态，避免自然语言描述的冗余。</p>
+</div>
+
+<div class="paper">
+<div class="paper-title">Search Context: ∇-Reasoner & Reasoning Trajectories</div>
+<div class="paper-meta">∇-Reasoner (2603.04948) | LLM Reasoning as Trajectories (2604.05655)</div>
+<p><strong>∇-Reasoner</strong> 在测试时通过隐空间梯度下降优化推理，是连续隐空间推理的并行路线。<strong>Reasoning Trajectories</strong> 将 CoT 建模为表示空间的结构化轨迹，发现数学推理穿过的子空间随层深增加而分离——这为 Abstract-CoT 的离散隐空间设计提供了理论支撑。</p>
+</div>
+
+<h2>🧭 我的判断</h2>
+
+<div class="my-take">
+<p><strong>隐空间推理正在成为 2026 年 LLM 推理效率的主战场。</strong></p>
+<br>
+<p>本周的 Abstract-CoT 是这个方向上的一个重要里程碑——它不是简单地压缩 CoT 文本，而是让模型学会一种<em>内部推理语言</em>。这与 Meta 之前的 Coconut（连续隐空间）、Google 的思维瓶颈（thinking bottleneck）构成了一个完整的谱系：</p>
+<br>
+<p style="text-align:center; color:#8b949e">
+  自然语言 CoT → 压缩 CoT → <strong style="color:#58a6ff">离散隐 token（Abstract-CoT）</strong> → 连续隐向量 → 端到端隐推理
+</p>
+<br>
+<p><strong>三个值得跟踪的信号：</strong></p>
+<ul>
+  <li class="pros"><span class="emoji-bullet">🟢</span> 如果 OpenAI/Anthropic/DeepMind 在接下来 3 个月内发布类似方向的工作，这个领域会立刻升温成军备竞赛。</li>
+  <li class="pros"><span class="emoji-bullet">🟢</span> 离散隐 token 的可解释性（目前是硬伤）如果能通过 probing 或稀疏自编码器解决，将是一个重要的 follow-up 方向。</li>
+  <li class="pros"><span class="emoji-bullet">🟡</span> Background Temperature（TMLR 2026）提出的 LLM 底层非确定性问题，对隐空间推理的一致性可能是隐患——但短期不会阻止论文发表。</li>
+</ul>
+<br>
+<p><strong>对 JC 的实用建议：</strong>Abstract-CoT 目前是 post-training 方案（不是预训练架构变更），这意味着未来可能出现开源的 Abstract-CoT LoRA/适配器。如果 11.6× token 压缩化为实际 API 成本节省，对 MiniMax Token Plan 这种免费额度策略是利好——同等额度能做更多推理任务。</p>
+</div>
+
+<hr class="section-divider">
+
+<h2>📊 本期摘要</h2>
+<ul>
+  <li><strong>核心主题</strong>：隐空间推理（Latent Reasoning）—— Abstract Chain-of-Thought 将推理 token 压缩 11.6×</li>
+  <li><strong>学术信号</strong>：ACL 2026 收录的 Preference Heads、TMLR 2026 的 Background Temperature 标志该方向进入顶会视野</li>
+  <li><strong>产业信号</strong>：IBM Research 的 Abstract-CoT 是产业实验室首次系统化探索离散隐空间推理</li>
+  <li><strong>风险提示</strong>：可解释性缺失是最大短板；训练成本尚高；精度未超越传统 CoT</li>
+</ul>
+
+<div class="footer">
+  xiaomimi 深度调研 · 2026-04-28 · 数据来源：arXiv cs.AI / cs.CL / Papers With Code / Web Search<br>
+  下一期：2026-04-29
+</div>
+
+</div>
+</body>
+</html>

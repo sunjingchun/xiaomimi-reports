@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>深度调研：MathDuels — LLM 双重角色自我对弈评估</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; line-height: 1.6; color: #222; background: #fafafa; }
+  h1 { font-size: 1.6em; color: #1a1a1a; border-bottom: 3px solid #4a90d9; padding-bottom: 8px; margin-bottom: 16px; }
+  h2 { font-size: 1.2em; color: #333; margin-top: 28px; margin-bottom: 12px; }
+  h3 { font-size: 1em; color: #555; margin-top: 20px; margin-bottom: 8px; }
+  p { margin: 10px 0; }
+  .summary { background: #e8f0fb; border-left: 4px solid #4a90d9; padding: 12px 16px; margin: 16px 0; border-radius: 0 6px 6px 0; }
+  ul { padding-left: 20px; }
+  li { margin: 6px 0; }
+  .limitations { background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px 16px; margin: 16px 0; border-radius: 0 6px 6px 0; }
+  .limitations strong { color: #856404; }
+  .verdict { background: #d4edda; border-left: 4px solid #28a745; padding: 12px 16px; margin: 16px 0; border-radius: 0 6px 6px 0; }
+  .verdict strong { color: #155724; }
+  code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+  .paper-box { background: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin: 12px 0; }
+  .paper-title { font-weight: bold; color: #1a1a1a; font-size: 1.05em; }
+  .paper-meta { color: #666; font-size: 0.85em; margin: 4px 0; }
+  .tag { display: inline-block; background: #e8f0fb; color: #4a90d9; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin-right: 4px; }
+  footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e0e0e0; color: #888; font-size: 0.85em; }
+</style>
+</head>
+<body>
+
+<h1>📊 MathDuels：LLM 双重角色自我对弈评估</h1>
+
+<p><strong>为什么重要</strong>：当前数学基准（MATH、GSM8K）已被前沿模型接近刷满，静态评估无法区分能力接近的模型。传统评估只测"解题"，忽略"出题"能力——而两者可能完全解耦。MathDuels 引入自对弈机制，让模型同时扮演出题者和解题者，评估难度随模型能力共同进化，永不饱和。</p>
+
+<div class="paper-box">
+<p class="paper-title">核心论文：MathDuels: Evaluating LLMs as Problem Posers and Solvers</p>
+<p class="paper-meta">作者：Zhiqiu Xu, Shibo Jin, Shreya Arya, Mayur Naik（宾夕法尼亚大学）| arXiv:2604.21916 | 2026-04-23</p>
+<p><span class="tag">顶会相关</span><span class="tag">新benchmark</span><span class="tag">自对弈</span></p>
+
+<h3>🔑 关键技术点</h3>
+<ul>
+  <li><strong>三重生成管线</strong>：meta-prompting → 问题生成 → 难度放大，通过对抗性提示逐步提升问题难度</li>
+  <li><strong>Rasch 模型联合估计</strong>：将解题者能力和问题难度联合建模，输出可比较的评分</li>
+  <li><strong>自对弈机制</strong>：每个模型给其他所有模型出题并解题，评分矩阵完全自动化</li>
+  <li><strong>动态难度天花板</strong>：新模型进入arena会自动产生更难问题，击败旧模型，benchmark难度共进化</li>
+  <li><strong>19个前沿模型实验</strong>：证明出题能力与解题能力部分解耦（解耦意味着两种能力是独立的）</li>
+</ul>
+
+<h3>📊 核心数据</h3>
+<ul>
+  <li>出题与解题能力相关系数弱：强解题者不一定是强出题者</li>
+  <li>新模型产生的问题能击败之前的主导解题模型</li>
+  <li>公开 leaderboard 持续更新：<code>mathduels.ai</code></li>
+</ul>
+
+<div class="limitations">
+<strong>⚠️ 局限性</strong>
+<ul>
+  <li>仅限数学领域，未覆盖代码、推理、多模态等其他能力维度</li>
+  <li>问题验证依赖符号求解器，对开放性数学问题不适用</li>
+  <li>需要大量计算资源（19个模型互相出题+解题）</li>
+  <li>评估结果依赖meta-prompting质量，prompt设计可能有偏</li>
+</ul>
+</div>
+</div>
+
+<div class="paper-box">
+<p class="paper-title">相关工作：Tool Attention — 消除 MCP/Tools Tax</p>
+<p class="paper-meta">作者：Deepak Kumar 等 | arXiv:2604.21816 | 2026-04-23</p>
+<p><span class="tag">Agent架构</span><span class="tag">有代码</span><span class="tag">MCP优化</span></p>
+
+<h3>🔑 关键技术点</h3>
+<ul>
+  <li><strong>Tools Tax 量化</strong>：典型多服务器部署每轮消耗 10k-60k token 的工具 schema，context 利用率才 24%</li>
+  <li><strong>Tool Attention 机制</strong>：将"Attention Is All You Need"从 token 泛化到工具层面，实现动态门控选择</li>
+  <li><strong>ISO 评分</strong>：用 sentence embeddings 计算 query 与工具 schema 的语义重叠度</li>
+  <li><strong>懒加载两阶段 loader</strong>：上下文只保留摘要池，按需将完整 JSON schema 晋升进来</li>
+  <li><strong>实测结果</strong>：每轮工具 token 减少 95%（47.3k → 2.4k），context 利用率从 24% 提升到 91%</li>
+</ul>
+
+<div class="limitations">
+<strong>⚠️ 局限性</strong>
+<ul>
+  <li>端到端指标（任务成功率、延迟、成本）为推算值，非 live agent 测量</li>
+  <li>模拟环境 120-tool/6-server，可能与真实部署有差异</li>
+  <li>依赖 sentence-embedding 模型质量，ISO 评分有开销</li>
+  <li>代码未在真实 MCP 生态中验证（GitHub: asadani/tool-attention）</li>
+</ul>
+</div>
+</div>
+
+<h2>🤖 相关工作</h2>
+<ul>
+  <li><strong>传统 benchmark 饱和</strong>：MATH、GSM8K 被刷到接近满分，AIME 2026 已被报告高分通过</li>
+  <li><strong>Live 竞技评估</strong>：Chatbot Arena (LMArena) 用人类投票，但成本高、速度慢</li>
+  <li><strong>竞争性基准</strong>：ARC Prize 等尝试对抗性构建问题，但仍是固定题库</li>
+  <li><strong>Agent 效率问题</strong>：Anthropic MCP 引入后，OpenAI/Google/Microsoft 均已采用，但 stateless 设计带来 token overhead</li>
+</ul>
+
+<h2>💡 我的判断</h2>
+<div class="verdict">
+<p><strong>⭐ 值得关注</strong>：MathDuels 是 LLM 评估范式的重要突破。</p>
+<ul>
+  <li>核心洞察是"出题能力 ≠ 解题能力"——这个发现对理解 LLM 真实能力边界有重要意义</li>
+  <li>自对弈 + 动态难度的设计解决了 benchmark 饱和的根本问题</li>
+  <li>公开 leaderboard 意味着研究社区可以持续参与，推动评估标准进化</li>
+  <li>落地价值：对模型采购方（企业/开发者）最有意义——可以区分能力接近的模型</li>
+</ul>
+<p><strong>Tool Attention</strong> 是工程层面的实用创新，解决的是已存在的 MCP 部署问题，但 paper 中端到端收益是推算值，需等真实环境验证。</p>
+</div>
+
+<footer>
+<p>📅 调研日期：2026-04-26 | 来源：arXiv cs.CL/cs.AI</p>
+</footer>
+
+</body>
+</html>

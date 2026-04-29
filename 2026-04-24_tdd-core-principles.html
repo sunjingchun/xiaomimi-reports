@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>tdd core principles</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:700px;margin:40px auto;padding:0 20px;line-height:1.6;color:#333}
+h1{color:#1a1a1a;border-bottom:2px solid #eee;padding-bottom:10px}
+h2{color:#2d5a9e;margin-top:30px}
+h3{color:#444}
+blockquote{border-left:4px solid #2d5a9e;margin:0;padding:5px 15px;color:#555;background:#f9f9f9}
+code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:0.9em}
+pre{background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:8px;overflow-x:auto}
+pre code{background:none;padding:0;color:inherit}
+table{border-collapse:collapse;width:100%;margin:15px 0}
+th,td{border:1px solid #ddd;padding:8px 12px;text-align:left}
+th{background:#f5f5f5}
+</style></head><body>
+<h1>tdd core principles</h1>
+<h1>TDD 核心原则 · 垂直切片工作流</h1>
+<blockquote>
+<p>来源：Kent Beck "Test Driven Development by Example" + Martin Fowler "Refactoring"
+提炼时间：2026-04-24</p>
+</blockquote>
+<hr />
+<h2>TDD 不是什么</h2>
+<p>TDD 不是"先写测试再写代码"。这个理解太浅，会导致实践变形。</p>
+<p>TDD 是一种<strong>设计工作流</strong>——用测试来驱动接口设计，用快速反馈来驱动代码演进。</p>
+<hr />
+<h2>核心原则</h2>
+<h3>1. 测试描述行为，不描述实现</h3>
+<p>好的测试：</p>
+<pre><code class="language-typescript">// ✅ 描述行为
+test('用户可以用书名搜索绘本', async () =&gt; {
+  const results = await searchBooks('丢失的星星');
+  expect(results).toContainEqual(expect.objectContaining({ title: '丢失的星星' }));
+});
+</code></pre>
+<p>坏的测试：</p>
+<pre><code class="language-typescript">// ❌ 描述实现
+test('searchBooks 调用了 Prisma 的 where 参数', () =&gt; {
+  const mock = prismaMock.book.findMany.mockResolvedTo([]);
+  await searchBooks('test');
+  expect(prismaMock.book.findMany).toHaveBeenCalledWith({
+    where: expect.objectContaining({ title: { contains: 'test' } })
+  });
+});
+</code></pre>
+<p><strong>为什么重要</strong>：实现可以随时改，测试不应该因为内部重构而失败。测试描述"能做什么"，不是"怎么做"。</p>
+<h3>2. 垂直切片，不是横向切片</h3>
+<pre><code>❌ 横向切片（错误方式）：
+  RED:   写 test1, test2, test3, test4, test5
+  GREEN: 一次性写 impl1, impl2, impl3, impl4, impl5
+
+✅ 垂直切片（正确方式）：
+  RED→GREEN: test1 → impl1
+  RED→GREEN: test2 → impl2
+  RED→GREEN: test3 → impl3
+</code></pre>
+<p><strong>横向切片的问题</strong>：
+- 一次写所有测试，测试的是"想象的行为"而不是"实际的需求"
+- 测的是数据结构形状，不是用户价值
+- 需求变时，测试全部要改</p>
+<p><strong>垂直切片的价值</strong>：
+- 每个测试都基于上一个测试学会的信息
+- 每个测试都是对"这条 user story 是否完成"的验证
+- 需求变时，只改相关的测试</p>
+<h3>3. 红 → 绿 → 重构，循环不颠倒</h3>
+<pre><code>[RED]    写一个不通过的测试 → 确认哪里不对
+[GREEN]  用最小代码让它通过     → 不求完美，只求通过
+[REFACTOR] 在测试保护下改善代码  → 安全地改结构
+</code></pre>
+<p><strong>关键规则</strong>：
+- 不跳过任何阶段
+- RED 阶段不写任何实现代码
+- GREEN 阶段不追求完美，只求测试通过
+- REFACTOR 阶段在测试保护下大胆重构
+- <strong>永远不让系统处于 RED 状态过夜</strong></p>
+<hr />
+<h2>行为测试的识别标准</h2>
+<p>满足以下任一条件的测试是行为测试：</p>
+<ul>
+<li>[ ] 调用者视角：测试从外部描述系统能做什么</li>
+<li>[ ] 换实现不换测试：换个数据库、换个 HTTP 库，测试还能跑</li>
+<li>[ ] 读测试能知道这个模块的价值：测试就是文档</li>
+<li>[ ] 不 mock 内部协作对象：只 mock 外部依赖（数据库、第三方 API）</li>
+</ul>
+<hr />
+<h2>与 AI coding 的关系</h2>
+<h3>为什么 TDD 在 AI 时代更重要</h3>
+<p>AI 生成代码的问题：看起来对，实际可能不对。传统编程里，看一眼知道对不对；AI 生成时，每行看起来都对，要跑才知道。</p>
+<p>TDD 提供了<strong>快速验证回路</strong>——AI 生成代码 → 测试立刻告诉你哪里不对 → AI 修正 → 再测。</p>
+<p>没有测试，AI 代码的错误可能藏了很久才发现。</p>
+<h3>具体实践建议</h3>
+<p><strong>用 AI 辅助 TDD</strong>：
+1. 让 AI 先写测试（描述你想验证的行为）
+2. 你 review 测试是否合理
+3. 让 AI 基于测试写实现
+4. 测试通过后，让 AI 提出重构机会</p>
+<p><strong>关键</strong>：不要让 AI 同时写测试和实现——这样 AI 会走捷径（测试mock一切让实现轻松通过）。</p>
+<hr />
+<h2>快速检验清单</h2>
+<p>拿到一个测试，问自己：</p>
+<ul>
+<li>[ ] 能从这个测试看出这个模块的价值是什么吗？</li>
+<li>[ ] 换个实现方式，这个测试还需要改吗？</li>
+<li>[ ] 如果不读实现代码，这个测试能独立验证功能吗？</li>
+</ul>
+<hr />
+<p><em>参考：Kent Beck "Test Driven Development by Example", 2002</em>
+<em>参考：Martin Fowler "Refactoring", 2018</em></p>
+</body></html>
