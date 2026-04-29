@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DeepSeek 公文写作 Chatbot 方案</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:800px;margin:0 auto;padding:20px;background:#1a1a2e;color:#e0e0e0;line-height:1.6}
+h1{color:#fd79a8;font-size:1.8em}h2{color:#00cec9;border-bottom:1px solid #2d3436;padding-bottom:8px;margin-top:32px}h3{color:#dfe6e9;margin-top:24px}h4{color:#fab1a0}
+table{width:100%;border-collapse:collapse;margin:16px 0}
+th{background:#2d3436;color:#00cec9;padding:10px 12px;text-align:left;font-size:14px}
+td{border-bottom:1px solid #2d3436;padding:8px 12px;font-size:14px}
+code{background:#2d3436;padding:2px 6px;border-radius:4px;font-size:13px;color:#fdcb6e}
+pre{background:#0a0a1a;padding:16px;border-radius:8px;overflow-x:auto;border:1px solid #2d3436;font-size:13px}
+pre code{background:transparent;padding:0;color:#dfe6e9}
+a{color:#74b9ff}strong{color:#ffeaa7}em{color:#81ecec}
+blockquote{border-left:3px solid #fd79a8;margin:16px 0;padding:8px 16px;background:#2d3436;border-radius:0 8px 8px 0}
+ul,ol{padding-left:24px}li{margin:6px 0}
+hr{border:none;border-top:1px solid #2d3436;margin:24px 0}
+</style>
+</head>
+<body>
+<h1>基于 DeepSeek 的公文写作 Chatbot 方案设计</h1>
+<blockquote>
+<p>生成时间：2026-04-29
+目标场景：讲话材料、发言稿、经验交流材料、调研报告
+底层模型：DeepSeek V4-Pro（thinking mode）</p>
+</blockquote>
+<hr />
+<h2>1. 公文写作 AI 的痛点与核心要求</h2>
+<h3>1.1 核心痛点</h3>
+<table>
+<thead>
+<tr>
+<th>痛点</th>
+<th>描述</th>
+<th>严重程度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>政治正确性</strong></td>
+<td>措辞必须符合当前政策口径，不能出现偏差表述</td>
+<td>🔴 致命</td>
+</tr>
+<tr>
+<td><strong>语体规范</strong></td>
+<td>公文有严格语体要求——正式、严谨、无歧义，AI 容易生成口语化/随意表达</td>
+<td>🔴 高</td>
+</tr>
+<tr>
+<td><strong>层级匹配</strong></td>
+<td>不同层级（部委/省/市/县/基层）用语习惯差异大，AI 难以自动适配</td>
+<td>🟡 中高</td>
+</tr>
+<tr>
+<td><strong>时效性</strong></td>
+<td>政策术语、领导讲话口径持续更新，AI 训练截止日期后的内容无法覆盖</td>
+<td>🟡 中高</td>
+</tr>
+<tr>
+<td><strong>格式规范</strong></td>
+<td>讲话稿、调研报告各有固定结构，AI 容易混用或遗漏必要部分</td>
+<td>🟡 中</td>
+</tr>
+<tr>
+<td><strong>数据准确性</strong></td>
+<td>涉及具体数据时 AI 容易编造（幻觉），政府场景零容忍</td>
+<td>🔴 高</td>
+</tr>
+<tr>
+<td><strong>文风统一</strong></td>
+<td>同一单位/同一领导多篇文稿需保持风格一致</td>
+<td>🟡 中</td>
+</tr>
+<tr>
+<td><strong>安全合规</strong></td>
+<td>涉密内容不能上云，国防/机要单位有严格网络隔离要求</td>
+<td>🔴 高（特殊场景）</td>
+</tr>
+</tbody>
+</table>
+<h3>1.2 核心要求</h3>
+<pre class="codehilite"><code>公文写作 AI 系统必须满足：
+
+1. 政治安全 → 输出经过政策合规过滤
+2. 语体准确 → 严格遵循《党政机关公文处理工作条例》规范
+3. 结构规范 → 每种文体有清晰模板约束
+4. 引用可信 → 数据/政策引用可溯源
+5. 风格可控 → 可指定层级、场合、受众
+6. 隐私合规 → 敏感场景支持纯本地推理
+</code></pre>
+
+<hr />
+<h2>2. 系统架构设计</h2>
+<h3>2.1 总体架构</h3>
+<pre class="codehilite"><code>┌─────────────────────────────────────────────────────┐
+│                    前端层 (Web UI)                     │
+│  公文类型选择 → 参数配置 → 草稿编辑 → 版本管理          │
+└──────────────────────┬──────────────────────────────┘
+                       │ HTTP/WebSocket
+┌──────────────────────▼──────────────────────────────┐
+│                   API 网关层                          │
+│  认证鉴权 → 请求路由 → 限流 → 日志审计               │
+└──────────────────────┬──────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────┐
+│                  核心业务层                            │
+│  ┌──────────┐  ┌──────────┐  ┌──────────────────┐  │
+│  │ 参数解析  │  │ Prompt   │  │  后处理 &amp; 过滤    │  │
+│  │ &amp; 校验    │→ │ 编排引擎  │→│  (敏感词/格式)    │  │
+│  └──────────┘  └──────────┘  └──────────────────┘  │
+│                       │                              │
+│  ┌────────────────────▼──────────────────────────┐  │
+│  │             RAG 检索增强层                      │  │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────────┐  │  │
+│  │  │ 范文库    │ │政策术语库 │ │层级表达规范库  │  │  │
+│  │  │ (向量检索) │ │(关键词+  │ │(按层级索引)   │  │  │
+│  │  │           │ │ 向量混合) │ │              │  │  │
+│  │  └──────────┘ └──────────┘ └──────────────┘  │  │
+│  └───────────────────────────────────────────────┘  │
+└──────────────────────┬──────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────┐
+│                  AI 模型层                            │
+│  DeepSeek V4-Pro (Thinking Mode)                     │
+│  base_url: https://api.deepseek.com                   │
+│  备选: 本地 Qwen2.5:14B (敏感场景)                    │
+└─────────────────────────────────────────────────────┘
+</code></pre>
+
+<h3>2.2 核心模块说明</h3>
+<h4>A. Prompt 编排引擎</h4>
+<pre class="codehilite"><code>用户输入参数：
+├── 文体类型 (讲话稿|发言稿|经验交流|调研报告)
+├── 使用层级 (部委|省|市|县|基层)
+├── 场合 (大会|座谈会|汇报会|培训班)
+├── 受众 (领导|同级|下级|群众)
+├── 主题/标题
+├── 关键要点 (bullet points)
+├── 字数要求
+├── 参考材料 (可选，粘贴或上传)
+└── 风格偏好 (正式度 0-10, 创新度 0-10)
+
+↓
+
+引擎构造 messages 数组：
+[
+  {role: &quot;system&quot;, 公文类型专用 prompt},
+  {role: &quot;system&quot;, RAG 检索到的范文片段},
+  {role: &quot;system&quot;, RAG 检索到的政策术语},
+  {role: &quot;user&quot;,  结构化任务描述}
+]
+</code></pre>
+
+<h4>B. RAG 检索增强层</h4>
+<ul>
+<li><strong>向量数据库</strong>：Milvus Lite（轻量）或 ChromaDB（Python 原生）</li>
+<li><strong>Embedding 模型</strong>：text-embedding-3-small（OpenAI 兼容，或本地 BGE-M3）</li>
+<li><strong>检索策略</strong>：先向量检索 top-k 相似范文 → 再关键词精确匹配政策术语 → 合并去重排序</li>
+</ul>
+<h4>C. 后处理 &amp; 安全过滤</h4>
+<pre class="codehilite"><code>输出处理管线：
+raw_output → 敏感词检测(AC自动机) → 格式校验(结构完整性) 
+→ 数据真实性标注(标记可能编造的数字) → 术语一致性复检 → final_output
+</code></pre>
+
+<h3>2.3 数据流示意</h3>
+<pre class="codehilite"><code>1. 用户输入 &quot;写一篇关于乡村振兴的座谈会发言稿，市级，1500字&quot;
+2. 参数解析 → 文体=发言稿, 层级=市, 场合=座谈会, 主题=乡村振兴, 字数=1500
+3. RAG 检索 → 查 3 篇相似范文 + &quot;乡村振兴&quot; 相关最新政策术语
+4. Prompt 组装 → system prompt + RAG 材料 + 结构化指令
+5. DeepSeek API → thinking mode, reasoning_effort=high, max_tokens=4000
+6. 输出后处理 → 敏感词过滤 + 格式校验
+7. 返回前端 → 可编辑草稿 + 术语高亮 + 引用溯源
+</code></pre>
+
+<hr />
+<h2>3. Prompt 设计策略</h2>
+<h3>3.1 System Prompt 设计原则</h3>
+<p>基于 DeepSeek V4-Pro 的思考模式特性：</p>
+<ol>
+<li><strong>角色锚定</strong>：用中文明确角色身份（比英文 role-play 对中文模型更有效）</li>
+<li><strong>结构先置</strong>：在 system prompt 中提供完整结构模板，让模型在思考阶段就按模板组织</li>
+<li><strong>约束后置</strong>：字数、禁用词等约束放 user prompt 末尾（DeepSeek 对末尾指令敏感）</li>
+<li><strong>思考模式利用</strong>：开启 thinking mode (reasoning_effort=high)，让模型先"构思结构"再输出</li>
+</ol>
+<h3>3.2 四种公文体 System Prompt 模板</h3>
+<h4>模板 A：工作讲话（领导讲话稿）</h4>
+<pre class="codehilite"><code>你是{层级}{单位名称}的资深笔杆子，有20年公文写作经验。
+你擅长撰写领导讲话稿，风格庄重、大气、有号召力。
+
+【核心原则】
+1. 政治站位要高，体现&quot;四个意识&quot;&quot;两个维护&quot;
+2. 结构遵循：开篇点题 → 形势分析 → 工作部署(3-4点) → 保障要求 → 号召收尾
+3. 每部分用&quot;同志们&quot;等称呼过渡
+4. 部署工作要求&quot;项目化、清单化&quot;：干什么、怎么干、谁来干、何时完成
+5. 引用最新政策精神时要准确，不确定的用通用表述替代
+
+【语言风格】
+- 使用排比句式增强气势
+- 适当使用成语和对仗
+- 避免过于口语化
+- 层次分明，小标题对仗工整
+
+【输出格式】
+一、[开篇段] 阐明会议目的、当前形势
+二、[工作部署] 3-4个重点任务，每个任务包含：为什么重要 + 具体要求 + 预期目标
+三、[保障措施] 组织领导、督查考核、作风建设
+四、[号召收尾] 鼓舞士气、凝聚共识
+</code></pre>
+
+<h4>模板 B：经验交流材料</h4>
+<pre class="codehilite"><code>你是{层级}{单位名称}的政策研究室主任，专门撰写经验交流材料。
+你的材料以&quot;做法实、亮点亮、可复制&quot;著称。
+
+【核心原则】
+1. 结构：标题(提炼亮点) → 背景(简短) → 主要做法(3-4条) → 成效 → 体会/启示
+2. &quot;做法&quot;部分是核心，占全文60%以上
+3. 每条做法=具体措施+创新点+实际案例(如有数据则引用)
+4. 避免空话套话，用&quot;我们做了X，取得了Y效果&quot;的句式
+5. 成效部分用数据说话，多用&quot;同比增长X%&quot;&quot;覆盖Y个&quot;等量化表达
+
+【语言风格】
+- 朴实、具体、可操作
+- 多用&quot;探索了&quot;&quot;建立了&quot;&quot;形成了&quot;等完成时动词
+- 少用&quot;要&quot;&quot;必须&quot;等祈使句（你不是在部署工作）
+
+【输出格式】
+一、背景与问题（200字以内）
+二、主要做法
+  （一）做法标题（12字以内对仗）
+    1. 具体措施
+    2. 创新之处
+    3. 取得成效
+  （二）...
+  （三）...
+三、工作成效（整体数据）
+四、几点体会（2-3条，提炼规律性认识）
+</code></pre>
+
+<h4>模板 C：调研报告</h4>
+<pre class="codehilite"><code>你是{层级}政策研究室的资深研究员，专精于撰写高质量调研报告。
+你的报告以&quot;问题导向、数据支撑、建议可行&quot;为特色。
+
+【核心原则】
+1. 标准结构：标题 → 摘要(200字) → 调研背景与方法 → 现状分析 → 问题诊断 → 对策建议 → 结语
+2. &quot;问题诊断&quot;是报告的魂，要切中要害，不回避矛盾
+3. &quot;对策建议&quot;要具体可行，每条建议对应前面的一个问题
+4. 数据必须准确，不确定的标注&quot;据初步统计&quot;&quot;估算&quot;等限定词
+5. 对策建议按照&quot;近期可做、中期可推、远期可谋&quot;分层
+
+【语言风格】
+- 客观、严谨、冷静
+- 使用&quot;调研发现&quot;&quot;数据显示&quot;&quot;XX反映&quot;等证据导向表述
+- 问题表述有分寸：用&quot;有待加强&quot;&quot;尚需完善&quot;，不用&quot;很差&quot;&quot;严重不足&quot;
+- 建议用&quot;建议&quot;&quot;可考虑&quot;&quot;宜&quot;，不用&quot;必须&quot;&quot;一定要&quot;
+
+【输出格式】
+一、调研背景与方法
+二、基本情况与主要成效
+三、存在问题与原因分析（按重要性排序，3-5条）
+四、对策建议（与问题一一对应）
+  （一）近期举措（3个月内）
+  （二）中期安排（半年-1年）
+  （三）远期规划
+五、结语
+</code></pre>
+
+<h4>模板 D：座谈会发言稿</h4>
+<pre class="codehilite"><code>你是{层级}{单位名称}的业务骨干，要在{场合}上做发言。
+你的发言要求：真诚、有干货、不超时。
+
+【核心原则】
+1. 结构：自我介绍(10%) → 对议题的认识(20%) → 本单位做法/面临的困难(50%) → 建议(20%)
+2. 对议题的&quot;认识&quot;要有个人视角，不是复读政策
+3. &quot;做法/困难&quot;部分要具体，讲一个真问题好过讲十个正确的废话
+4. 发言稿字数严格控制在{字数}字以内（按每分钟200字朗读速度核算）
+5. 开头要有称呼：&quot;尊敬的XX（主持人职务），各位同仁&quot;
+
+【语言风格】
+- 自然、坦诚、适度口语化
+- 可用&quot;我们当时&quot;&quot;我印象很深的是&quot;等叙述性表达
+- 避免官话套话堆砌
+- 结尾简短有力
+
+【输出格式】
+[称呼]
+[开头：表达参会感受，点出核心观点]
+[主体：做法/困难/建议，2-3个分点]
+[结尾：简短表态或请求支持]
+</code></pre>
+
+<h3>3.3 Few-shot 示例选择策略</h3>
+<pre class="codehilite"><code>策略：TYPE × LEVEL × LENGTH 三维匹配
+
+1. TYPE 匹配：目标文体与示例文体一致（讲话稿→讲话稿）
+2. LEVEL 匹配：目标层级与示例层级一致或相近（市级→市级或省级）
+3. LENGTH 匹配：目标字数与示例字数在±50%范围内
+
+检索方法：
+- 向量相似度检索（embedding cosine similarity）
+- top-3 最相似示例注入 system prompt（不是 user prompt）
+- 每篇示例截取前 800 tokens（控制上下文预算）
+
+示例库管理：
+- 按 文体/层级/场合/字数 四维索引
+- 手工精选 50-100 篇高质量范文
+- 每季度更新（纳入新政策口径）
+</code></pre>
+
+<h3>3.4 角色扮演 Prompt 策略</h3>
+<p>DeepSeek V4-Pro 对中文角色扮演响应良好。核心技巧：</p>
+<pre class="codehilite"><code>【效果最好】
+&quot;你是XX省委政研室的资深笔杆子，从业25年，专门给省委主要领导起草讲话稿。
+你的文章被中办刊物转载过12次。&quot;
+
+【效果次之】
+&quot;请以一位有20年公文写作经验的政研室主任的身份写作。&quot;
+
+【效果最差】
+&quot;You are a senior government speechwriter with 20 years of experience.&quot;
+（英文角色对中文生成帮助不大）
+</code></pre>
+
+<p><strong>角色细粒度控制</strong>：
+- 职位 + 年限 + 成就 → 影响文风正式度
+- 所在单位 → 影响用语习惯（党委口 vs 政府口）
+- 服务过的领导风格 → 影响文风倾向（务实型 vs 理论型）</p>
+<hr />
+<h2>4. 知识库设计（RAG 方案）</h2>
+<h3>4.1 三大知识库</h3>
+<h4>4.1.1 范文库</h4>
+<pre class="codehilite"><code>类型：向量检索（embedding + 元数据过滤）
+规模：初始 200-500 篇，逐步扩充
+来源：
+  - 《求是》《人民日报》公开发表文章
+  - 各级政府网站公开的讲话/报告
+  - 党内法规文件（公开部分）
+  - 用户自有范文（上传后私有存储）
+
+元数据标注：
+{
+  &quot;title&quot;: &quot;XX&quot;,
+  &quot;type&quot;: &quot;讲话稿|发言稿|经验交流|调研报告&quot;,
+  &quot;level&quot;: &quot;中央|省|市|县|基层&quot;,
+  &quot;occasion&quot;: &quot;大会|座谈会|汇报会|培训班|开幕式&quot;,
+  &quot;topic_tags&quot;: [&quot;乡村振兴&quot;, &quot;数字经济&quot;, ...],
+  &quot;word_count&quot;: 3500,
+  &quot;date&quot;: &quot;2025-06&quot;,
+  &quot;source&quot;: &quot;求是杂志&quot;,
+  &quot;quality&quot;: 5  // 1-5 打分
+}
+
+检索策略：
+1. 向量相似度检索 top-20
+2. 元数据过滤（type + level 精确匹配）
+3. 重排序（按 quality 和日期加权）
+4. 返回 top-3，每篇截取 800 tokens
+</code></pre>
+
+<h4>4.1.2 政策术语库</h4>
+<pre class="codehilite"><code>类型：关键词索引 + 向量混合检索
+规模：5000-10000 条术语
+结构：
+{
+  &quot;term&quot;: &quot;新质生产力&quot;,
+  &quot;definition&quot;: &quot;创新起主导作用，摆脱传统经济增长方式...&quot;,
+  &quot;first_mentioned&quot;: &quot;2023年9月，习近平总书记在黑龙江考察时首次提出&quot;,
+  &quot;related_terms&quot;: [&quot;高质量发展&quot;, &quot;科技创新&quot;, &quot;产业升级&quot;],
+  &quot;usage_context&quot;: &quot;适用于经济工作讲话、产业调研报告&quot;,
+  &quot;taboo_usage&quot;: &quot;不能与'传统生产力'对立表述&quot;,
+  &quot;update_date&quot;: &quot;2024-03&quot;
+}
+
+更新频率：每月抓取《人民日报》《求是》《新闻联播》文字稿
+维护方式：AI 辅助提取 + 人工审核
+</code></pre>
+
+<h4>4.1.3 层级表达规范库</h4>
+<pre class="codehilite"><code>按五级行政层级，记录用语差异：
+
+示例：&quot;重视&quot;一词的表达
+
+| 层级 | 常用表述                          |
+|------|-----------------------------------|
+| 中央 | &quot;高度重视&quot;&quot;摆在突出位置&quot;           |
+| 省   | &quot;高度重视&quot;&quot;作为重大政治任务&quot;       |
+| 市   | &quot;摆在重要议事日程&quot;&quot;强力推进&quot;       |
+| 县   | &quot;作为头等大事&quot;&quot;一把手工程&quot;         |
+| 基层 | &quot;集中力量&quot;&quot;下大力气&quot;              |
+
+示例：问题严重程度表述
+
+| 层级 | 最重表述                  | 中等表述                  | 轻微表述            |
+|------|--------------------------|--------------------------|---------------------|
+| 中央 | &quot;形势严峻&quot;&quot;面临挑战&quot;      | &quot;有待加强&quot;                | &quot;尚有差距&quot;          |
+| 省   | &quot;不容乐观&quot;&quot;压力较大&quot;      | &quot;存在短板&quot;                | &quot;还需提升&quot;          |
+| 市   | &quot;问题突出&quot;&quot;矛盾集中&quot;      | &quot;仍需改进&quot;                | &quot;发展不平衡&quot;        |
+| 县   | &quot;任务艰巨&quot;&quot;困难较多&quot;      | &quot;基础薄弱&quot;                | &quot;尚在起步阶段&quot;       |
+
+存储方式：YAML/Markdown 表格，在构造 prompt 时按层级注入
+</code></pre>
+
+<h3>4.2 RAG 技术选型</h3>
+<pre class="codehilite"><code>┌─────────────────┬───────────────────┬──────────────────┐
+│ 组件              │ 推荐                │ 备选               │
+├─────────────────┼───────────────────┼──────────────────┤
+│ 向量数据库        │ ChromaDB (轻量)     │ Milvus Lite        │
+│ Embedding 模型    │ BGE-M3 (本地)       │ text-embedding-3   │
+│ 文档解析          │ Unstructured.io     │ LangChain loader  │
+│ RAG 框架          │ LlamaIndex          │ LangChain          │
+│ 重排序            │ BGE-Reranker-v2     │ Cohere Rerank API │
+└─────────────────┴───────────────────┴──────────────────┘
+
+推荐组合：ChromaDB + BGE-M3 + LlamaIndex
+- 全本地部署，零外部依赖
+- BGE-M3 中文效果优于 OpenAI embedding
+- ChromaDB Python 原生支持，部署零门槛
+</code></pre>
+
+<h3>4.3 RAG 数据流</h3>
+<pre class="codehilite"><code>文档入库流程：
+原始文档 → 格式清洗 → 分块(512 tokens, overlap 50) 
+→ BGE-M3 embedding → ChromaDB 存储
+
+检索流程：
+用户 query → 关键词提取 → 
+├── 向量检索(ChromaDB 相似度 top-20)
+├── 关键词精确匹配(政策术语库)
+└── 层级规则注入(表达规范库)
+→ 合并去重 → BGE-Reranker 重排序 → top-5 
+→ 格式化为 prompt 注入片段
+</code></pre>
+
+<hr />
+<h2>5. 技术栈推荐 + 部署方案</h2>
+<h3>5.1 推荐技术栈</h3>
+<pre class="codehilite"><code>前端:
+├── Next.js 14 (React + TypeScript)
+├── TailwindCSS + shadcn/ui (组件库)
+├── TipTap (富文本编辑器，支持 Markdown)
+└── React Query (状态管理/缓存)
+
+后端:
+├── Next.js API Routes / FastAPI (Python)
+├── Prisma (ORM) + PostgreSQL (业务数据)
+├── ChromaDB (向量数据库)
+├── Redis (会话 &amp; 缓存)
+└── BullMQ (异步任务队列)
+
+AI 层:
+├── DeepSeek V4-Pro (思考模式)
+│   base_url: https://api.deepseek.com
+│   model: deepseek-v4-pro
+│   thinking: enabled, reasoning_effort: high
+├── 本地 Qwen2.5:14B (敏感场景/隐私模式)
+│   通过 Ollama: http://host.internal:11434
+└── BGE-M3 (本地 embedding)
+
+运维:
+├── Docker Compose (容器化)
+├── Nginx (反向代理 + SSL)
+├── Prometheus + Grafana (监控)
+└── GitHub Actions (CI/CD)
+</code></pre>
+
+<h3>5.2 部署方案</h3>
+<h4>方案 A：轻量部署（个人/小团队，推荐起步）</h4>
+<pre class="codehilite"><code class="language-yaml"># docker-compose.yml
+services:
+  app:
+    build: .
+    ports: [&quot;3000:3000&quot;]
+    env:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DATABASE_URL=postgresql://...
+    depends_on: [postgres, chromadb, redis]
+
+  postgres:
+    image: postgres:16-alpine
+    volumes: [pgdata:/var/lib/postgresql/data]
+
+  chromadb:
+    image: chromadb/chroma:latest
+    volumes: [chromadata:/chroma/chroma]
+
+  redis:
+    image: redis:7-alpine
+
+volumes:
+  pgdata:
+  chromadata:
+</code></pre>
+
+<ul>
+<li><strong>资源需求</strong>：2 CPU / 4GB RAM / 20GB 磁盘</li>
+<li><strong>适合场景</strong>：5 人以内，日生成 10-50 篇</li>
+<li><strong>月度成本</strong>：DeepSeek API ¥20-100 + 服务器（如有现有 Mac mini VM 则免费）≈ ¥20-100/月</li>
+</ul>
+<h4>方案 B：完整部署（团队使用）</h4>
+<ul>
+<li>增加 PostgreSQL 主从、Redis Cluster</li>
+<li>BGE-M3 部署到独立 GPU 实例（如需低延迟 RAG）</li>
+<li>增加文件存储（MinIO，存用户上传的参考材料）</li>
+<li>月度成本：DeepSeek API ¥50-500 + 云服务器 ¥200-500 ≈ ¥250-1000/月</li>
+</ul>
+<h3>5.3 JC 现有环境适配</h3>
+<pre class="codehilite"><code>已有资源：
+✅ DeepSeek API Key（openclaw.json 中已配置）
+✅ Ollama (qwen2.5:14b) — 本地推理备份
+✅ Mac mini VM (12GB RAM) — 可运行 ChromaDB + BGE-M3（CPU 推理）
+✅ PostgreSQL（如用到 picturebook-kg 的 PG 实例可复用）
+✅ Docker Compose 环境
+
+建议部署路径：
+1. 在 Mac mini VM 上部署 ChromaDB + BGE-M3（内存占用 &lt; 4GB）
+2. 复用已有 PG（新建 schema）
+3. Next.js 应用部署在同一 VM
+4. API 调用 DeepSeek 云端 + 隐私场景回落本地 Ollama
+</code></pre>
+
+<hr />
+<h2>6. 成本估算</h2>
+<h3>6.1 DeepSeek V4-Pro 定价（2026-04）</h3>
+<table>
+<thead>
+<tr>
+<th>计费项</th>
+<th>标准价（¥/百万tokens）</th>
+<th>2.5折优惠价（至2026/05/31）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>输入（缓存未命中）</td>
+<td>12</td>
+<td>3</td>
+</tr>
+<tr>
+<td>输入（缓存命中）</td>
+<td>0.1</td>
+<td>0.025</td>
+</tr>
+<tr>
+<td>输出</td>
+<td>24</td>
+<td>6</td>
+</tr>
+</tbody>
+</table>
+<h3>6.2 单次生成成本</h3>
+<p>假设典型用法（思考模式，reasoning_effort=high）：</p>
+<pre class="codehilite"><code>场景：生成 2000 字讲话稿
+
+输入 tokens：
+├── System prompt (角色+模板): ~800 tokens
+├── RAG 注入片段 (3篇范文×800字): ~1800 tokens
+├── 用户指令 + 参考材料: ~500 tokens
+└── 总计: ~3100 tokens（假设 50% 缓存命中）
+    = 1550×¥0.025 + 1550×¥3 = ¥0.039 + ¥4.65 ≈ ¥4.69/百万
+    实际输入成本 ≈ 3100 × ¥0.003 ≈ ¥0.009
+
+输出 tokens：
+├── reasoning_content (内部): ~3000 tokens (不收费！)
+├── 最终 content (2000字≈3000 tokens): 约 3000 tokens
+└── 输出成本 ≈ 3000 × ¥0.006 ≈ ¥0.018
+
+单次总成本 ≈ ¥0.009 + ¥0.018 ≈ ¥0.027
+
+实际估算（含重试）：¥0.03 - ¥0.05/篇
+</code></pre>
+
+<h3>6.3 月度使用量成本</h3>
+<table>
+<thead>
+<tr>
+<th>使用规模</th>
+<th>月生成量</th>
+<th>API 成本（优惠价）</th>
+<th>恢复原价后</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>个人偶尔用</td>
+<td>30 篇</td>
+<td>~¥1.5</td>
+<td>~¥6</td>
+</tr>
+<tr>
+<td>日常使用</td>
+<td>100 篇</td>
+<td>~¥5</td>
+<td>~¥20</td>
+</tr>
+<tr>
+<td>高频使用</td>
+<td>300 篇</td>
+<td>~¥15</td>
+<td>~¥60</td>
+</tr>
+<tr>
+<td>团队协作</td>
+<td>1000 篇</td>
+<td>~¥50</td>
+<td>~¥200</td>
+</tr>
+</tbody>
+</table>
+<h3>6.4 上下文硬盘缓存优化</h3>
+<p>DeepSeek 提供<strong>上下文硬盘缓存</strong>（KV Cache），可大幅降低输入成本：</p>
+<pre class="codehilite"><code>优化策略：
+- System Prompt 固定部分（模板）→ 缓存命中，¥0.025/百万tokens
+- 预热：启动时发送一次完整 system prompt → 后续请求缓存命中
+
+启用后，输入成本可降低 90%：
+├── 缓存命中部分（system prompt + 模板）: ~2000 tokens × ¥0.000025 ≈ ¥0.00005
+├── 缓存未命中部分（用户输入）: ~1100 tokens × ¥0.003 ≈ ¥0.0033
+└── 输入总成本: ~¥0.0034（降低 62%）
+
+单篇成本降至: ¥0.0034 + ¥0.018 ≈ ¥0.021
+月300篇成本: ¥6.4（优惠价），¥25.6（原价）
+</code></pre>
+
+<h3>6.5 成本控制建议</h3>
+<ol>
+<li><strong>缓存优化</strong>：固定 system prompt 放最前面，最大化缓存命中</li>
+<li><strong>模型选择</strong>：简单的格式润色/扩写用 deepseek-v4-flash（便宜 4 倍）</li>
+<li><strong>本地回落</strong>：隐私不敏感 + 简单任务 → Ollama qwen2.5:14b（免费）</li>
+<li><strong>RAG 截断</strong>：严格控制注入范文的长度（800 tokens/篇 × 3篇）</li>
+<li><strong>批量预热</strong>：每天首次请求前批量预热缓存</li>
+</ol>
+<hr />
+<h2>7. 完整 Prompt 示例</h2>
+<p>以下为实际可用的 prompt 示例，使用 OpenAI API 格式调用 DeepSeek V4-Pro。</p>
+<h3>示例 1：工作讲话（安全生产工作部署讲话）</h3>
+<pre class="codehilite"><code class="language-python">import openai
+
+client = openai.OpenAI(
+    api_key=&quot;&lt;your-deepseek-key&gt;&quot;,
+    base_url=&quot;https://api.deepseek.com&quot;
+)
+
+response = client.chat.completions.create(
+    model=&quot;deepseek-v4-pro&quot;,
+    messages=[
+        {
+            &quot;role&quot;: &quot;system&quot;,
+            &quot;content&quot;: &quot;&quot;&quot;你是XX市应急管理局政研室的资深笔杆子，从业18年，专门给市领导起草安全生产相关讲话。
+你笔下的讲话有三个特点：问题找得准、措施定得实、语言有力度。
+
+【写作原则】
+1. 安全生产讲话要有&quot;忧患意识&quot;——先讲问题、敲警钟，再讲部署
+2. 措施要&quot;可执行&quot;：每条都包含&quot;谁来做、做什么、标准是什么&quot;
+3. 善用&quot;三个必须&quot;（管行业必须管安全、管业务必须管安全、管生产经营必须管安全）
+4. 引用案例时用&quot;近期国内发生的X起事故表明...&quot;（不具体点名）
+5. 结尾要有&quot;如履薄冰&quot;&quot;时时放心不下&quot;等安全领域常用表述
+
+【标准框架】
+一、开篇（当前形势 + 会议目的）
+二、深刻认识当前安全生产面临的严峻形势（2-3个问题）
+三、聚焦重点领域，全力抓好安全防范工作（3-4个领域）
+四、压紧压实责任，确保各项措施落地见效
+五、号召收尾&quot;&quot;&quot;
+        },
+        {
+            &quot;role&quot;: &quot;user&quot;,
+            &quot;content&quot;: &quot;&quot;&quot;请撰写一篇市级安全生产委员会全体会议上的讲话稿。
+
+【具体要求】
+- 发言身份：市长、市安委会主任
+- 场合：市安委会2026年第二次全体会议
+- 字数：2000字左右
+- 重点领域：建筑施工、城镇燃气、消防安全
+- 当前背景：一季度事故同比上升，进入夏季高温施工期
+- 风格：严肃、有力、部署明确&quot;&quot;&quot;
+        }
+    ],
+    reasoning_effort=&quot;high&quot;,
+    extra_body={&quot;thinking&quot;: {&quot;type&quot;: &quot;enabled&quot;}},
+    max_tokens=6000
+)
+
+print(response.choices[0].message.content)
+</code></pre>
+
+<h3>示例 2：经验交流材料（乡村振兴产业帮扶）</h3>
+<pre class="codehilite"><code class="language-python">response = client.chat.completions.create(
+    model=&quot;deepseek-v4-pro&quot;,
+    messages=[
+        {
+            &quot;role&quot;: &quot;system&quot;,
+            &quot;content&quot;: &quot;&quot;&quot;你是XX省农业农村厅政策研究处的笔杆子，有15年三农工作经验。
+你最擅长写经验交流材料：做法实、数据准、模式可推广。
+
+【写作原则】
+1. 标题要提炼亮点，用&quot;动词+宾语+效果&quot;结构
+2. 正文70%篇幅给&quot;做法&quot;，每条做法=措施+数据+效果
+3. 数据用具体数字，不用&quot;大幅提升&quot;&quot;明显改善&quot;等模糊表述
+4. 每部分小标题对仗工整，12字以内
+5. 结尾的&quot;体会&quot;要有规律性认识，不能写成表决心
+
+【标准框架】
+一、背景与问题（150字，快速带过）
+二、主要做法（每个做法300-400字，含措施+案例+数据）
+  （一）7字对仗标题
+  （二）7字对仗标题
+  （三）7字对仗标题
+三、工作成效（列出3-5个关键指标数据）
+四、几点体会（2-3条规律性认识）&quot;&quot;&quot;
+        },
+        {
+            &quot;role&quot;: &quot;user&quot;,
+            &quot;content&quot;: &quot;&quot;&quot;请撰写一篇省级经验交流材料。
+
+【具体要求】
+- 主题：XX县&quot;电商+合作社+农户&quot;产业帮扶模式
+- 场合：全省乡村振兴工作现场推进会
+- 字数：2500字
+- 关键数据（请合理填入框架）：
+  - 建成镇村电商服务站点87个
+  - 培育农民专业合作社132家
+  - 带动4260户农户年均增收1.8万元
+  - 2025年农产品网络零售额突破3.2亿元
+- 核心亮点：品牌化运营、冷链物流体系、利益联结机制&quot;&quot;&quot;
+        }
+    ],
+    reasoning_effort=&quot;high&quot;,
+    extra_body={&quot;thinking&quot;: {&quot;type&quot;: &quot;enabled&quot;}},
+    max_tokens=6000
+)
+
+print(response.choices[0].message.content)
+</code></pre>
+
+<h3>示例 3：调研报告（养老服务体系建设）</h3>
+<pre class="codehilite"><code class="language-python">response = client.chat.completions.create(
+    model=&quot;deepseek-v4-pro&quot;,
+    messages=[
+        {
+            &quot;role&quot;: &quot;system&quot;,
+            &quot;content&quot;: &quot;&quot;&quot;你是XX市民政局政研室的资深研究员，专精于撰写民生领域的调研报告。
+你的报告以&quot;数据翔实、问题深刻、建议可行&quot;受到市委市政府主要领导多次批示。
+
+【写作原则】
+1. 问题是报告的灵魂——敢于直面矛盾，但不越政治红线
+2. 现状用数据说话，问题用事实说明，建议用路径落定
+3. 调研方法要交代清楚（座谈会X场、走访X个点位、问卷X份）
+4. 每个问题对应1-2条建议，不脱节
+5. 建议分近期、中期、远期三层，增强可操作性
+6. 用&quot;调研发现&quot;&quot;数据显示&quot;&quot;XX反映&quot;，不用&quot;我认为&quot;&quot;我觉得&quot;
+
+【标准框架】
+一、调研背景与方法（150字）
+二、基本情况（300字，用数据描述现状）
+三、主要做法与成效（400字，肯定已有成绩）
+四、存在问题与原因分析（600字，核心部分，按重要性排序3-5个问题）
+五、对策建议（800字，与问题一一对应）
+  （一）近期建议（3个月内可启动）
+  （二）中期建议（半年-1年）
+  （三）远期建议（1-3年系统布局）
+六、结语（100字）&quot;&quot;&quot;
+        },
+        {
+            &quot;role&quot;: &quot;user&quot;,
+            &quot;content&quot;: &quot;&quot;&quot;请撰写一篇关于养老服务体系建设情况的调研报告。
+
+【具体要求】
+- 调研主体：XX市人大常委会专题调研组
+- 调研范围：全市3个区（县）、12个养老服务机构
+- 调研方式：实地走访、座谈会6场、发放问卷500份
+- 字数：3000-3500字
+- 需要涉及的要点：
+  1. 居家社区养老覆盖情况
+  2. 机构养老床位供给与结构性矛盾
+  3. 医养结合推进中的堵点
+  4. 养老服务人才短缺问题
+  5. 长期护理保险试点情况
+- 数据留空标注[数据待填充]，便于使用者填入实际数据&quot;&quot;&quot;
+        }
+    ],
+    reasoning_effort=&quot;high&quot;,
+    extra_body={&quot;thinking&quot;: {&quot;type&quot;: &quot;enabled&quot;}},
+    max_tokens=8000
+)
+
+print(response.choices[0].message.content)
+</code></pre>
+
+<hr />
+<h2>8. 进阶特性设计</h2>
+<h3>8.1 多轮对话优化</h3>
+<pre class="codehilite"><code>场景：用户生成初稿后要求&quot;第二段语气不够有力，改一下&quot;
+
+实现策略：
+1. 保留初稿全文在上下文
+2. 追加 user message: &quot;第二段语言力度不够，请用更有力的排比句式改写，保持原意&quot;
+3. DeepSeek 思考模式下会自动对比两版差异并输出优化版
+4. 上下文管理：保留最近 3 版，超出后摘要压缩
+
+token 成本：每轮 ~6000 tokens 输入 + ~1000 tokens 输出 ≈ ¥0.03/轮
+</code></pre>
+
+<h3>8.2 风格迁移</h3>
+<pre class="codehilite"><code>功能：学习某位领导的文风，复刻到新稿件
+
+实现：
+1. 上传该领导 3-5 篇历史讲话
+2. 提取特征：句式长度、惯用词频、排比偏好、开头/结尾模式
+3. 构建 &quot;风格描述&quot; prompt 片段注入 system prompt
+4. 生成时约束模型模仿该风格
+
+示例风格描述：
+&quot;该领导讲话特点：短句为主（平均15字/句），善用反问和设问，
+喜欢引用古诗词，开头惯用'今天是...的日子'，结尾常用
+'让我们...'号召句式，数字表达多用'翻一番''突破XX亿'&quot;
+</code></pre>
+
+<h3>8.3 合规检查流水线</h3>
+<pre class="codehilite"><code class="language-python"># 后处理敏感词检查（本地执行，不上传云端）
+SENSITIVE_PATTERNS = [
+    # 领导姓名（避免错误表述）
+    # 敏感历史事件
+    # 领土问题表述（港澳台藏疆）
+    # 特定禁用词汇
+]
+
+def compliance_check(text: str) -&gt; dict:
+    &quot;&quot;&quot;
+    返回：{passed: bool, issues: [{position, severity, suggestion}]}
+    &quot;&quot;&quot;
+    # AC 自动机多模式匹配
+    # 返回所有命中及其上下文
+</code></pre>
+
+<hr />
+<h2>9. 竞争产品分析</h2>
+<h3>9.1 现有产品对比</h3>
+<table>
+<thead>
+<tr>
+<th>产品</th>
+<th>优势</th>
+<th>劣势</th>
+<th>价格</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>讯飞公文写作</strong></td>
+<td>语音输入、多终端覆盖、机关单位渗透率高</td>
+<td>模板化严重、缺乏深度思考、大模型能力一般</td>
+<td>企业版 ¥3000+/年</td>
+</tr>
+<tr>
+<td><strong>WPS AI 公文</strong></td>
+<td>与 WPS 深度集成、格式排版自动化、本地化部署选项</td>
+<td>依赖 WPS 生态、模型</td>
+<td></td>
+</tr>
+<tr>
+<td>能力受限于金山自有模型</td>
+<td>WPS 会员 ¥89/年 + AI ¥198/年</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>百度公文写作助手</strong></td>
+<td>百度搜索生态词库、政策文件库大</td>
+<td>产品更新慢、功能简陋</td>
+<td>免费（基础功能）</td>
+</tr>
+<tr>
+<td><strong>笔杆网</strong></td>
+<td>专注公文领域、范文库丰富</td>
+<td>AI 能力弱、用户体验老旧</td>
+<td>¥199/年</td>
+</tr>
+<tr>
+<td><strong>ChatGPT + 自有 prompt</strong></td>
+<td>模型能力强</td>
+<td>政治正确性无保障、中文公文语感差、需翻墙</td>
+<td>$20/月</td>
+</tr>
+<tr>
+<td><strong>DeepSeek + 本方案</strong></td>
+<td>模型能力强(思考模式)、中文公文体感好、成本极低、可私有化部署</td>
+<td>需自行搭建 RAG 和前端</td>
+<td>API 按量付费(月¥5-60)</td>
+</tr>
+</tbody>
+</table>
+<h3>9.2 本方案核心优势</h3>
+<ol>
+<li><strong>模型碾压</strong>：DeepSeek V4-Pro 思考模式在中文长文生成方面远超国内竞品使用的模型</li>
+<li><strong>成本极致</strong>：API 单篇 ¥0.03-0.05，是讯飞/WPS 的 1/100</li>
+<li><strong>完全可控</strong>：开源技术栈，不绑定任何平台</li>
+<li><strong>隐私安全</strong>：支持纯本地模式（Ollama + 本地 RAG）</li>
+<li><strong>可定制</strong>：prompt、模板、风格全部可自建</li>
+</ol>
+<hr />
+<h2>10. 实施路线图</h2>
+<h3>Phase 1：MVP（2-3 周）</h3>
+<pre class="codehilite"><code>目标：能用的单文体生成器
+
+功能：
+✅ 网页输入框 + 文体选择 + 字数设置
+✅ 4 种文体内置 prompt 模板
+✅ DeepSeek API 调用（thinking mode）
+✅ Markdown 渲染输出 + 一键复制
+✅ 简单的敏感词后处理
+
+技术：
+- Next.js 14 单页面
+- API Route 直接调用 DeepSeek
+- 暂无需数据库和 RAG
+
+开发量：~2 人周
+</code></pre>
+
+<h3>Phase 2：RAG 增强（2-3 周）</h3>
+<pre class="codehilite"><code>功能：
+✅ 范文库（初始化 100 篇精选范文）
+✅ ChromaDB + BGE-M3 向量检索
+✅ 政策术语库（初始化 2000 条）
+✅ 生成时自动检索并注入相关素材
+✅ 引用溯源标注
+
+开发量：~3 人周
+</code></pre>
+
+<h3>Phase 3：完整体验（3-4 周）</h3>
+<pre class="codehilite"><code>功能：
+✅ 用户系统（多用户、私有范文库）
+✅ 版本管理（保留历史生成记录）
+✅ 风格迁移（学习领导文风）
+✅ 多轮改写
+✅ 格式导出（Word/PDF，保持公文格式）
+✅ 本地隐私模式切换
+
+开发量：~4 人周
+</code></pre>
+
+<hr />
+<h2>11. 风险与应对</h2>
+<table>
+<thead>
+<tr>
+<th>风险</th>
+<th>概率</th>
+<th>影响</th>
+<th>应对</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DeepSeek API 敏感词过滤导致输出中断</td>
+<td>中</td>
+<td>高</td>
+<td>前端实时检测 + 本地 Ollama 备选</td>
+</tr>
+<tr>
+<td>政策术语时效性滞后</td>
+<td>高</td>
+<td>中</td>
+<td>政策术语库月度自动更新 + 人工审核</td>
+</tr>
+<tr>
+<td>生成内容政治不正确</td>
+<td>低</td>
+<td>致命</td>
+<td>多层过滤（模型层 + 后处理 + 人工审核建议）</td>
+</tr>
+<tr>
+<td>API 服务中断</td>
+<td>低</td>
+<td>中</td>
+<td>本地 Ollama 自动 fallback</td>
+</tr>
+<tr>
+<td>大模型幻觉编造数据</td>
+<td>中</td>
+<td>高</td>
+<td>数据字段标注 <code>[数据待确认]</code> + 用户二次确认流程</td>
+</tr>
+<tr>
+<td>涉密内容上云</td>
+<td>低</td>
+<td>致命</td>
+<td>隐私模式强制本地推理 + 上传前警告弹窗</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>附录 A：DeepSeek API 调用参数参考</h2>
+<pre class="codehilite"><code class="language-python"># 推荐的公文生成 API 调用参数
+{
+    &quot;model&quot;: &quot;deepseek-v4-pro&quot;,       # 最强模型
+    &quot;messages&quot;: [...],                # system + user messages
+    &quot;reasoning_effort&quot;: &quot;high&quot;,       # 深度推理（公文需要）
+    &quot;extra_body&quot;: {
+        &quot;thinking&quot;: {&quot;type&quot;: &quot;enabled&quot;}  # 启用思考模式
+    },
+    &quot;max_tokens&quot;: 8192,               # 足够输出 3000-4000 字
+    &quot;temperature&quot;: null,              # 思考模式下不支持，不传
+    &quot;stream&quot;: True                    # 流式输出，改善用户体验
+}
+</code></pre>
+
+<h2>附录 B：关键词</h2>
+<ul>
+<li>公文写作 AI</li>
+<li>DeepSeek V4-Pro</li>
+<li>讲话稿模板</li>
+<li>RAG 检索增强</li>
+<li>思考模式 (Thinking Mode)</li>
+<li>Prompt Engineering</li>
+<li>政策术语库</li>
+<li>层级表达规范</li>
+<li>ChromaDB</li>
+<li>BGE-M3</li>
+</ul>
+<hr />
+<blockquote>
+<p>文档版本：v1.0 | 生成日期：2026-04-29 | 基于 DeepSeek API 官方文档（2026-04 更新）和公文写作领域知识综合编写。</p>
+</blockquote>
+</body>
+</html>
