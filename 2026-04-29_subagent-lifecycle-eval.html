@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>subagent-lifecycle v5 运行评估</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:800px;margin:0 auto;padding:20px;background:#1a1a2e;color:#e0e0e0;line-height:1.6}
+h1{color:#fd79a8;font-size:1.8em}h2{color:#00cec9;border-bottom:1px solid #2d3436;padding-bottom:8px;margin-top:32px}h3{color:#dfe6e9;margin-top:24px}
+table{width:100%;border-collapse:collapse;margin:16px 0}
+th{background:#2d3436;color:#00cec9;padding:10px 12px;text-align:left;font-size:14px}
+td{border-bottom:1px solid #2d3436;padding:8px 12px;font-size:14px}
+code{background:#2d3436;padding:2px 6px;border-radius:4px;font-size:13px;color:#fdcb6e}
+pre{background:#0a0a1a;padding:16px;border-radius:8px;overflow-x:auto;border:1px solid #2d3436;font-size:13px}
+a{color:#74b9ff}strong{color:#ffeaa7}
+blockquote{border-left:3px solid #fd79a8;margin:16px 0;padding:8px 16px;background:#2d3436;border-radius:0 8px 8px 0}
+</style>
+</head>
+<body>
+<h1>Subagent-Lifecycle v5 运行评估</h1>
+<blockquote>
+<p>评估时间: 2026-04-29 17:45 CST<br />
+评估范围: 3 批共 8 个子 agent<br />
+评估者: xiaomimi 🐱</p>
+</blockquote>
+<hr />
+<h2>总体结果: ✅ 成功</h2>
+<p><strong>8/8 子 agent 全部产出完整报告，全部转 HTML 上线 GitHub Pages。</strong></p>
+<h2>各批次详况</h2>
+<h3>Batch 1 (13:24 spawn, 三路并行)</h3>
+<table>
+<thead>
+<tr>
+<th>任务</th>
+<th>report.md</th>
+<th>HTML</th>
+<th>归档</th>
+<th>质量</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>coding-agent-benchmark</td>
+<td>22.7KB</td>
+<td>✅</td>
+<td>✅</td>
+<td>4 工具对比+benchmark+costs</td>
+</tr>
+<tr>
+<td>crawl-framework</td>
+<td>13KB+17KB代码+5.6KB skill</td>
+<td>✅</td>
+<td>✅</td>
+<td>产出最全</td>
+</tr>
+<tr>
+<td>agent-context-protocol</td>
+<td>30.7KB+18.6KB代码</td>
+<td>✅</td>
+<td>✅</td>
+<td>业界参考+协议设计</td>
+</tr>
+</tbody>
+</table>
+<p><strong>skill 暴露的问题</strong>: 
+- 上一个 session 误判（并行 completion event 未独立处理）→ <strong>v5 已修</strong>
+- 子 agent prompt 里写了 <code>$WORKSPACE/sessions.jsonl</code>，isolated context 无法展开 → <strong>v5 已修</strong>（职责归主 agent）</p>
+<h3>Batch 2 (16:32 spawn, 三路并行)</h3>
+<table>
+<thead>
+<tr>
+<th>任务</th>
+<th>report.md</th>
+<th>HTML</th>
+<th>归档</th>
+<th>质量</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>codex-deploy-guide</td>
+<td>21.6KB</td>
+<td>✅</td>
+<td>✅</td>
+<td>Lightsail/EC2/GitHub Actions三个场景</td>
+</tr>
+<tr>
+<td>gitnexus-review</td>
+<td>15.9KB</td>
+<td>✅</td>
+<td>✅</td>
+<td>能力边界+许可证风险分析</td>
+</tr>
+<tr>
+<td>yixing-travel-plan</td>
+<td>11.4KB</td>
+<td>✅</td>
+<td>✅</td>
+<td>3天行程+宠物友好+充电站</td>
+</tr>
+</tbody>
+</table>
+<p><strong>skill 暴露的问题</strong>: 子 agent 产出 HTML 报错无回滚机制（降级到 raw markdown 即可）</p>
+<h3>Batch 3 (17:33 spawn, 两路并行)</h3>
+<table>
+<thead>
+<tr>
+<th>任务</th>
+<th>report.md</th>
+<th>HTML</th>
+<th>归档</th>
+<th>质量</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>getnotes-analysis</td>
+<td>11.1KB</td>
+<td>✅</td>
+<td>✅</td>
+<td>模型溯源+prompt engineering分析</td>
+</tr>
+<tr>
+<td>gov-doc-chatbot</td>
+<td>35KB</td>
+<td>✅</td>
+<td>✅</td>
+<td>4 公文体 prompt 模板+RAG 架构+成本估算</td>
+</tr>
+</tbody>
+</table>
+<h2>Skill 各阶段表现</h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>行为</th>
+<th>评价</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1.1 Deny 拦截</td>
+<td>8/8 正常通过，无 deny 命中</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>1.2 Prompt 构建</td>
+<td>v5 版本职责分界生效，子 agent 不再尝试写 sessions.jsonl</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>1.3 Spawn</td>
+<td>全部 timeoutSeconds:600，1 次 timeout（gov-doc-chatbot 实际 ~480s）</td>
+<td>✅ 边界足够</td>
+</tr>
+<tr>
+<td>1.4 登记</td>
+<td>Batch 1 完整，Batch 2/3 registry 缺少 sessionKey</td>
+<td>⚠️ 修复中</td>
+</tr>
+<tr>
+<td>Phase 2 监控</td>
+<td>在 session 切换中 completion event 正确到达</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>3.1 收集</td>
+<td>优先读 archive → fallback 读 report.md</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>3.4 Registry 更新</td>
+<td>部分更新（Batch 1 完整，Batch 2/3 需要补）</td>
+<td>⚠️</td>
+</tr>
+<tr>
+<td>4.1-4.3 归档</td>
+<td>sessions.jsonl + MEMORY.md + registry archived</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>4.4 GitHub Pages</td>
+<td>全部 8 份 HTML 上线，索引自动更新</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>4.4 Telegram 通知</td>
+<td>按新规则只发链接，不发文件</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<h2>发现的问题</h2>
+<h3>1. Registry 数据不完整（中等）</h3>
+<p>Batch 2/3 的 registry 记录 sessionKey 字段丢失（显示为 <code>?</code>），根因是 Phase 3.4/4.3 的 shell 脚本变量 <code>$KEY</code> 在 session 切换后未正确获取。不影响产出（HTML 都在），但 registry 作为单一事实源不可靠。</p>
+<p><strong>修复</strong>: 在 Phase 3.4/4.3 前从 <code>subagent-archive/&lt;label&gt;.md</code> 的 YAML frontmatter 中提取 sessionKey。</p>
+<h3>2. 子 agent 自归档覆盖率不完整（低）</h3>
+<p>8 个任务只有 batch 1 的 3 个写了 subagent-archive。后续任务的自归档文件位置分散（被写在各自的 PROJECT_DIR 下而非统一的 subagent-archive/）。Phase 3.1 的 fallback 到 report.md 缓解了影响。</p>
+<p><strong>修复</strong>: Phase 3.1 增加搜索逻辑——先搜统一目录，再搜 PROJECT_DIR。</p>
+<h3>3. gov-doc-chatbot 接近超时（低）</h3>
+<p>实际运行约 480s，600s 超时刚好兜住。该任务涉及大量 web_search + RAG 架构设计+prompt 模板生成，合并在一个子 agent 里偏重。</p>
+<p><strong>建议</strong>: 若单任务预计 tool call &gt; 20 次，考虑拆成两个子 agent（调研 + 设计）。</p>
+<h2>与 v4 对比</h2>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>v4 表现</th>
+<th>v5 改进</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>职责分界</td>
+<td>子 agent 尝试写 sessions.jsonl 失败</td>
+<td>✅ 子 agent 只写自归档+结果文件</td>
+</tr>
+<tr>
+<td>路径变量</td>
+<td><code>$WORKSPACE</code> 无法展开</td>
+<td>✅ prompt 中全部用绝对路径</td>
+</tr>
+<tr>
+<td>并行处理</td>
+<td>误判整批失败</td>
+<td>✅ 独立处理每个 completion event</td>
+</tr>
+<tr>
+<td>手机阅读</td>
+<td>内联代码块体验差</td>
+<td>✅ GitHub Pages HTML 暗色主题</td>
+</tr>
+<tr>
+<td>prompt 具体性</td>
+<td>无指导</td>
+<td>✅ 1.2 节加经验表</td>
+</tr>
+</tbody>
+</table>
+<h2>综合评分</h2>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>评分</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>可用性</td>
+<td>⭐⭐⭐⭐⭐</td>
+<td>8/8 任务产出完整，生产可用</td>
+</tr>
+<tr>
+<td>健壮性</td>
+<td>⭐⭐⭐⭐</td>
+<td>Registry 小问题不影响产出，需修</td>
+</tr>
+<tr>
+<td>可维护性</td>
+<td>⭐⭐⭐⭐</td>
+<td>审计/索引/归档链路清晰</td>
+</tr>
+<tr>
+<td>自动化</td>
+<td>⭐⭐⭐⭐⭐</td>
+<td>spawn→产出→HTML→GitHub Pages 全自动</td>
+</tr>
+<tr>
+<td>文档完整性</td>
+<td>⭐⭐⭐⭐⭐</td>
+<td>Skill 文档 v5 覆盖所有实战发现</td>
+</tr>
+</tbody>
+</table>
+<p><strong>结论</strong>: subagent-lifecycle v5 已达到生产可用级别。registry 字段提取问题修复后即可定稿。</p>
+</body>
+</html>
