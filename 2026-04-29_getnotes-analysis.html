@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>得到 Get笔记 深度调研</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:800px;margin:0 auto;padding:20px;background:#1a1a2e;color:#e0e0e0;line-height:1.6}
+h1{color:#fd79a8;font-size:1.8em}h2{color:#00cec9;border-bottom:1px solid #2d3436;padding-bottom:8px;margin-top:32px}h3{color:#dfe6e9;margin-top:24px}h4{color:#fab1a0}
+table{width:100%;border-collapse:collapse;margin:16px 0}
+th{background:#2d3436;color:#00cec9;padding:10px 12px;text-align:left;font-size:14px}
+td{border-bottom:1px solid #2d3436;padding:8px 12px;font-size:14px}
+code{background:#2d3436;padding:2px 6px;border-radius:4px;font-size:13px;color:#fdcb6e}
+pre{background:#0a0a1a;padding:16px;border-radius:8px;overflow-x:auto;border:1px solid #2d3436;font-size:13px}
+pre code{background:transparent;padding:0;color:#dfe6e9}
+a{color:#74b9ff}
+strong{color:#ffeaa7}
+em{color:#81ecec}
+blockquote{border-left:3px solid #fd79a8;margin:16px 0;padding:8px 16px;background:#2d3436;border-radius:0 8px 8px 0}
+ul,ol{padding-left:24px}li{margin:6px 0}
+hr{border:none;border-top:1px solid #2d3436;margin:24px 0}
+</style>
+</head>
+<body>
+<h1>「得到 Get笔记」深度调研报告</h1>
+<blockquote>
+<p>调研日期：2026-04-29
+调研人：xiaomimi (subagent: getnotes-analysis)
+数据截止：2025-09 至 2026-03 公开报道</p>
+</blockquote>
+<hr />
+<h2>1. 产品定位与功能概览</h2>
+<h3>基本信息</h3>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>详情</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>产品名称</td>
+<td>Get笔记</td>
+</tr>
+<tr>
+<td>开发商</td>
+<td>北京思维造物信息科技股份有限公司（「得到」团队）</td>
+</tr>
+<tr>
+<td>发布时间</td>
+<td>2024年6月（2025年1月跨年演讲正式发布）</td>
+</tr>
+<tr>
+<td>产品经理</td>
+<td>快刀青衣（得到联合创始人）</td>
+</tr>
+<tr>
+<td>官方网址</td>
+<td>https://www.biji.com/</td>
+</tr>
+<tr>
+<td>定价</td>
+<td>免费版 + PRO年费 ¥199</td>
+</tr>
+<tr>
+<td>产品形态</td>
+<td>iOS / Android / 微信小程序 / Mac / Windows / Web</td>
+</tr>
+</tbody>
+</table>
+<h3>核心定位</h3>
+<p><strong>「你只管说，AI帮你记」</strong>——定位为知识消化系统和第二大脑，解决碎片化信息管理难题。</p>
+<p>核心三环：<strong>好记 → 好找 → 好用</strong></p>
+<h3>核心功能</h3>
+<ol>
+<li><strong>🎤 AI 语音记录</strong>：实时转文字 + AI 智能润色，支持27种方言，离线录音</li>
+<li><strong>📝 会议纪要</strong>：录音+拍照+批注整合，标注发言人时间点，点击文字可回放</li>
+<li><strong>📷 智能拍书</strong>：拍纸质书页自动识别书名，笔记归类到对应书籍，同步得到电子书划线</li>
+<li><strong>🔗 链接一键消化</strong>：贴链接自动提取摘要生成笔记</li>
+<li><strong>💾 个人知识库</strong>：多主题知识库+AI问答+团队协作+订阅博主/直播</li>
+<li><strong>🔍 AI 智能搜索</strong>：语义搜索，基于笔记内容回答</li>
+<li><strong>📱 GetSeed AI 录音卡</strong>：硬件配件，一键标记重点、闪念捕捉</li>
+</ol>
+<h3>用户规模与营收</h3>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>数据</th>
+<th>时间</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>累计注册用户</td>
+<td>150万+</td>
+<td>2025年9月</td>
+</tr>
+<tr>
+<td>日活跃用户</td>
+<td>约5万</td>
+<td>2025年7月</td>
+</tr>
+<tr>
+<td>付费会员</td>
+<td>16,625人</td>
+<td>2025年7月</td>
+</tr>
+<tr>
+<td>年营收</td>
+<td>约430万元</td>
+<td>2025年7月（整体亏损）</td>
+</tr>
+<tr>
+<td>新用户占比</td>
+<td>54%（纯素人，未用过得到）</td>
+<td>2025年9月</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>2. 底层模型确认（证据链）</h2>
+<h3>多模型混合架构</h3>
+<p>Get笔记<strong>并非使用单一模型</strong>，而是采用混合架构：</p>
+<h4>① 豆包大模型（字节跳动）— 日常润色与对话</h4>
+<p><strong>证据</strong>：
+- 搜狐文章《Get笔记深度体验》（2025-10-11）明确写道：<em>"AI助手基于豆包大模型"</em>
+- 搜狐文章《Get笔记：AI赋能知识管理》（2025-10-11）：<em>"AI助手使用豆包大模型，支持联网搜索和深度思考"</em>
+- 腾讯云文章中提到语音转文字 API 成本高，提到"不管是豆包还是通义听悟，基本是几块钱一小时"</p>
+<h4>② DeepSeek-R1（满血版）— 深度推理搜索</h4>
+<p><strong>证据</strong>：
+- Get笔记<strong>官方帮助文档</strong>（doc.biji.com）明确写道：<em>"AI智能搜索，已接入满血版DeepSeek-R1"</em>、<em>"优质数据+强大推理模型，才会发挥出最佳效果"</em>
+- 官方文档收录了用户文章《当DeepSeek与Get笔记结合在一起，教育创业者工作流翻倍提升》
+- 官方文档收录了曹将文章《DeepSeek卡顿时，这个APP救了我》</p>
+<h3>模型使用场景推测</h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>可能使用的模型</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>语音转文字</td>
+<td>豆包/通义听悟 ASR API</td>
+<td>成本几块钱/小时，符合描述</td>
+</tr>
+<tr>
+<td>AI 润色（口语转书面语）</td>
+<td>豆包大模型</td>
+<td>搜狐文章确认</td>
+</tr>
+<tr>
+<td>AI 搜索（知识库问答）</td>
+<td>DeepSeek-R1</td>
+<td>官方文档确认</td>
+</tr>
+<tr>
+<td>链接摘要提取</td>
+<td>豆包大模型</td>
+<td>搜狐文章确认</td>
+</tr>
+<tr>
+<td>图片 OCR/识别</td>
+<td>可能是多模态模型（豆包视觉）</td>
+<td>功能描述推断</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>3. 公文化写作能力分析</h2>
+<h3>3.1 Get笔记的"润色"机制</h3>
+<p>根据量子位智库对快刀青衣的访谈，Get笔记的语音润色有以下特点：</p>
+<blockquote>
+<p><em>"我们调优AI时，核心理念是让用户觉得生产出来的内容是'自己的'，不是AI的，也不是Get笔记的。"</em></p>
+<p><em>"把原始录音文件和AI调完的内容拿给他们看，他们就开始挑毛病，说'不应该这样，该学某个人某几篇文章的风格'。"</em></p>
+<p><em>"我们要的是'优美的中文、优美的白话文'。"</em></p>
+</blockquote>
+<h3>3.2 调优团队背景</h3>
+<p>Get笔记的AI润色调优团队包括：
+- <strong>李倩</strong>：北大出身，语言学家
+- <strong>贾行家</strong>：作家
+- <strong>罗振宇</strong>：沟通表达专业人士
+- <strong>脱不花</strong>：沟通表达专业人士
+- 其他资深内容创作者</p>
+<p><strong>关键细节</strong>：团队在调优时参考的语料非常小众——例如20世纪30年代香港《大公报》某专栏作者的文字风格。快刀青衣说："如果不是在这个团队，我根本不会知道这个人。"</p>
+<h3>3.3 Prompt Engineering 分析（推理+证据）</h3>
+<p>虽然 Get笔记未公开其具体 system prompt，但从公开信息可以拼凑出以下策略：</p>
+<ol>
+<li><strong>去机器味</strong>：核心目标是让润色后的文字"不像 AI 写的"，而是像用户自己写的</li>
+<li><strong>去个人风格化</strong>：拒绝让所有用户输出都像鲁迅、巴金等知名文学家的风格，追求"优美的白话文"而非特定风格</li>
+<li><strong>专人调优</strong>：不是写 general prompt，而是让语言学专家逐条审阅输出，提出修改方向</li>
+<li><strong>小众语料参考</strong>：不用大路货（鲁迅/巴金/茅盾），而是用精心筛选的中文语料做风格锚定</li>
+<li><strong>口语→书面语的精确转换</strong>：去口头禅（嗯、啊、这个、那个）同时保留口语感，不写成生硬的书面文章</li>
+</ol>
+<hr />
+<h2>4. 中文语感优势的可能来源</h2>
+<p>基于公开信息分析，Get笔记中文语感好的原因不是单一技术手段，而是<strong>系统工程</strong>：</p>
+<h3>4.1 第一层：专家调优（Human-in-the-loop Prompt Engineering）</h3>
+<p>不是写了个 prompt 就不管了。语言学专家、作家、资深内容人逐条审阅 AI 输出，像改稿一样训练 AI。</p>
+<p><strong>影响权重：高</strong>（这是最核心的差异化）</p>
+<h3>4.2 第二层：小众高质量语料选择</h3>
+<p>不像其他产品用"模仿鲁迅"这种泛化 prompt，而是从特定时期、特定作者的优质中文中提取语感特征。</p>
+<p><strong>影响权重：中高</strong></p>
+<h3>4.3 第三层：用户个人知识库做 RAG</h3>
+<p>AI 搜索基于用户自己的笔记和知识库内容回答，数据源精准。快刀青衣说："当数据源足够精准，AI的输出质量就会很高，它不是网上抓取的垃圾新闻。"</p>
+<p><strong>影响权重：中</strong></p>
+<h3>4.4 第四层：多模型混合</h3>
+<p>豆包处理日常语言润色（字节的中文 NLP 积累），DeepSeek-R1 处理深度推理。各取所长。</p>
+<p><strong>影响权重：中</strong></p>
+<h3>4.5 不太可能做的事情</h3>
+<ul>
+<li><strong>微调（Fine-tuning）</strong>：未见公开信息表明做了模型微调</li>
+<li><strong>Few-shot 示例注入</strong>：未见相关信息</li>
+<li><strong>自研模型</strong>：明确使用外部模型（豆包+DeepSeek）</li>
+</ul>
+<hr />
+<h2>5. 优缺点对比</h2>
+<h3>5.1 Get笔记 vs 原生 DeepSeek 写作</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Get笔记</th>
+<th>原生 DeepSeek Web/API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>中文语感</td>
+<td>⭐⭐⭐⭐⭐ 经专家调优，优美白话文</td>
+<td>⭐⭐⭐ 原生输出有时偏生硬/翻译腔</td>
+</tr>
+<tr>
+<td>公文写作适配</td>
+<td>⭐⭐⭐⭐ 润色功能接近公文语感（推测）</td>
+<td>⭐⭐ 未经专项优化</td>
+</tr>
+<tr>
+<td>个性化</td>
+<td>⭐⭐⭐⭐⭐ 输出像"自己写的"</td>
+<td>⭐ 无个性化</td>
+</tr>
+<tr>
+<td>功能完整性</td>
+<td>⭐⭐⭐ 专注笔记+知识管理</td>
+<td>⭐⭐⭐⭐⭐ 通用对话全能</td>
+</tr>
+<tr>
+<td>开放性</td>
+<td>⭐ 封闭平台</td>
+<td>⭐⭐⭐⭐⭐ API/开源</td>
+</tr>
+<tr>
+<td>成本</td>
+<td>¥199/年</td>
+<td>API 按 token 计费</td>
+</tr>
+</tbody>
+</table>
+<h3>5.2 Get笔记 vs 其他 AI 写作工具</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Get笔记</th>
+<th>腾讯 ima</th>
+<th>印象笔记 AI</th>
+<th>Notion AI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>语音转文字</td>
+<td>⭐⭐⭐⭐⭐</td>
+<td>⭐⭐</td>
+<td>⭐⭐</td>
+<td>不支持</td>
+</tr>
+<tr>
+<td>中文润色质量</td>
+<td>⭐⭐⭐⭐⭐</td>
+<td>⭐⭐⭐</td>
+<td>⭐⭐⭐</td>
+<td>⭐⭐</td>
+</tr>
+<tr>
+<td>知识库 RAG</td>
+<td>⭐⭐⭐⭐</td>
+<td>⭐⭐⭐⭐（微信生态）</td>
+<td>⭐⭐⭐</td>
+<td>⭐⭐⭐（数据库）</td>
+</tr>
+<tr>
+<td>团队协作</td>
+<td>基础</td>
+<td>强大</td>
+<td>强大</td>
+<td>强大</td>
+</tr>
+<tr>
+<td>公文写作</td>
+<td>⭐⭐⭐⭐（推测）</td>
+<td>⭐⭐</td>
+<td>⭐⭐</td>
+<td>⭐</td>
+</tr>
+<tr>
+<td>微信整合</td>
+<td>弱</td>
+<td>⭐⭐⭐⭐⭐</td>
+<td>⭐⭐</td>
+<td>弱</td>
+</tr>
+</tbody>
+</table>
+<h3>5.3 Get笔记的优势</h3>
+<ol>
+<li><strong>中文语感业界领先</strong>：语言学专家+作家协作调优</li>
+<li><strong>语音体验极佳</strong>：27种方言、离线录音、声纹识别</li>
+<li><strong>用户共创模式</strong>：100+用户群，需求投票决定产品方向</li>
+<li><strong>硬软结合</strong>：GetSeed 录音卡差异化</li>
+</ol>
+<h3>5.4 Get笔记的劣势</h3>
+<ol>
+<li><strong>生态封闭</strong>：微信整合弱，无法直接导入聊天记录</li>
+<li><strong>商业化困难</strong>：¥199/年收入覆盖不了API成本</li>
+<li><strong>团队协作弱</strong>：不如飞书/Notion</li>
+<li><strong>大文档处理弱</strong>：不如百度文库等</li>
+</ol>
+<hr />
+<h2>6. 对 JC 自建公文 Chatbot 的参考价值</h2>
+<h3>6.1 可借鉴的核心方法论</h3>
+<p><strong>① 专家调优 &gt; 泛化 Prompt</strong>
+Get笔记的成功证明：一个语言学专家逐条审阅比写100个 prompt 模板更有效。建议 JC 找1-2位熟悉公文写作的人（或用自己的判断），对 chatbot 输出做多轮审阅调优。</p>
+<p><strong>② 小众高质量语料做 Style Anchor</strong>
+不要用"模仿政府公文风格"这种泛化 prompt。精选特定时期、特定部门的高质量公文（如国务院公报、政策解读文章）做风格锚点。</p>
+<p><strong>③ "去机器味"优先于"风格化"</strong>
+Get笔记调优的第一目标是让文字不像AI写的。公文写作同理：先去掉生硬的AI腔，再谈模仿特定文风。</p>
+<p><strong>④ 混合模型策略</strong>
+日常润色用中文语感好的模型（豆包/通义千问），深度推理用推理强的模型（DeepSeek-R1）。不要一棵树上吊死。</p>
+<p><strong>⑤ RAG 精准数据源 &gt; 大模型本身能力</strong>
+如果 JC 的 chatbot 能基于用户过往的公文做 RAG，输出质量会比通用模型高很多。</p>
+<h3>6.2 不建议复制的东西</h3>
+<ul>
+<li><strong>豆包模型</strong>：如果 JC 不打算用字节系，可换通义千问/Kimi 等在中文上同样有积累的模型</li>
+<li><strong>¥199 定价</strong>：公文 chatbot 可能是另一种商业模式</li>
+<li><strong>硬件</strong>：不需要录音卡这种投入</li>
+</ul>
+<h3>6.3 具体行动建议</h3>
+<ol>
+<li><strong>模型选择</strong>：DeepSeek-R1 做推理，通义千问/Kimi 做中文润色</li>
+<li><strong>Prompt Pipeline</strong>：不是单一 prompt，而是 口语→结构提取→公文润色 的多步流程</li>
+<li><strong>语料库构建</strong>：精选50-100篇高质量公文作为风格 anchor</li>
+<li><strong>质量评估</strong>：定一个"像人写的不像 AI 写的"的内测标准</li>
+<li><strong>MVP 快速验证</strong>：先做个 prompt chain 版本验证中文公文语感是否达标</li>
+</ol>
+<hr />
+<h2>7. 信息来源</h2>
+<table>
+<thead>
+<tr>
+<th>来源</th>
+<th>URL</th>
+<th>关键信息</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Get笔记官方文档</td>
+<td>doc.biji.com</td>
+<td>DeepSeek-R1接入、产品功能</td>
+</tr>
+<tr>
+<td>AITNT新闻</td>
+<td>aitntnews.com/newDetail.html?newId=10261</td>
+<td>快刀青衣产品拆解</td>
+</tr>
+<tr>
+<td>量子位智库访谈</td>
+<td>53ai.com（转载）</td>
+<td>专家调优细节、用户画像</td>
+</tr>
+<tr>
+<td>人人都是产品经理</td>
+<td>woshipm.com/ai/6361939.html</td>
+<td>功能评测、用户数据</td>
+</tr>
+<tr>
+<td>搜狐科技</td>
+<td>sohu.com/a/942810080_122362510</td>
+<td>豆包大模型确认</td>
+</tr>
+<tr>
+<td>搜狐科技</td>
+<td>sohu.com/a/942810083_122362510</td>
+<td>AI助手=豆包模型确认</td>
+</tr>
+<tr>
+<td>腾讯云开发者社区</td>
+<td>cloud.tencent.com/developer/news/2791136</td>
+<td>营收数据、API成本</td>
+</tr>
+<tr>
+<td>AIWW工具导航</td>
+<td>aiww.com/aitool/getbiji</td>
+<td>产品基本信息</td>
+</tr>
+<tr>
+<td>百度百科</td>
+<td>baike.baidu.com/item/Get笔记</td>
+<td>产品基本信息</td>
+</tr>
+<tr>
+<td>搜狐科技</td>
+<td>sohu.com/a/953991498_122362510</td>
+<td>用户共创模式、150万用户</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>报告完成。如有遗漏或需要补充的方向，请告知。</em></p>
+</body>
+</html>
